@@ -9,4 +9,4 @@ export async function setup() {
   process.env.JWT_SECRET = process.env.JWT_SECRET ?? '0123456789abcdef';
   await runMigrations(url);
 }
-export async function teardown() { await container.stop(); }
+export async function teardown() { if (container) await container.stop(); }
