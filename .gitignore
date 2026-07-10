@@ -1,0 +1,40 @@
+# === 시크릿 (정의서 §6 — 절대 커밋 금지) ===
+local.properties
+**/google-services.json
+**/FIREBASE_SERVICE_ACCOUNT*.json
+*firebase*serviceaccount*.json
+.env
+.env.*
+!.env.example
+
+# === Node / 서버·대시보드 ===
+node_modules/
+dist/
+build/
+coverage/
+*.log
+.DS_Store
+npm-debug.log*
+pnpm-debug.log*
+yarn-error.log*
+
+# === Android ===
+android-agent/.gradle/
+android-agent/build/
+android-agent/app/build/
+android-agent/app/libs/knoxsdk.jar
+android-agent/.idea/
+android-agent/local.properties
+*.keystore
+*.jks
+
+# === IDE ===
+.idea/
+*.iml
+.vscode/
+
+# === Drizzle ===
+# 마이그레이션 산출물은 커밋한다 (drizzle/ 는 추적)
+
+# === Knox SDK 애드온 (Samsung restricted software — git 미포함, 로컬/아티팩트 보관) ===
+addon_knox_api_level_28_samsung_electronics/
