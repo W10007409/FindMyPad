@@ -5,6 +5,7 @@ import type { FcmSender } from './services/fcm.js';
 import { registerErrorHandler } from './plugins/error-handler.js';
 import { registerAdminAuthRoutes } from './routes/admin/auth.js';
 import { registerDeviceRoutes } from './routes/devices.js';
+import { registerReportRoutes } from './routes/reports.js';
 
 export interface AppDeps { config: Config; db: DbClient; fcm: FcmSender; }
 
@@ -14,6 +15,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   registerErrorHandler(app);
   registerAdminAuthRoutes(app);
   registerDeviceRoutes(app);
+  registerReportRoutes(app);
   app.get('/health', async () => ({ status: 'ok' }));
   return app;
 }

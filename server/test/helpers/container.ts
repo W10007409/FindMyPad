@@ -7,6 +7,7 @@ export async function setup() {
   const url = container.getConnectionUri();
   process.env.DATABASE_URL = url;
   process.env.JWT_SECRET = process.env.JWT_SECRET ?? '0123456789abcdef';
+  process.env.TRUST_PROXY = 'true';
   await runMigrations(url);
 }
 export async function teardown() { if (container) await container.stop(); }
