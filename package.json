@@ -10,7 +10,8 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "db:generate": "drizzle-kit generate",
-    "db:migrate": "tsx server/src/db/migrate.ts"
+    "db:migrate": "tsx server/src/db/migrate.ts",
+    "seed:admin": "tsx server/src/db/seed-cli.ts"
   },
   "dependencies": {
     "fastify": "^4.28.1",
