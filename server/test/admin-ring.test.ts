@@ -1,0 +1,33 @@
+import { describe, it, expect, beforeEach, afterAll } from 'vitest';
+import { makeTestApp } from './helpers/app.js';
+import { seedAdmin } from '../src/db/seed.js';
+
+const ctx = makeTestApp();
+let atoken: string, deviceId: number;
+beforeEach(async () => {
+  await ctx.truncate();
+  await seedAdmin(ctx.db, 'root', 'secret123', 'admin');
+  const enroll = await ctx.app.inject({ method: 'POST', url: '/api/devices/enroll', payload: { serial: 'S1', fcmToken: 'FCM-1' } });
+  deviceId = enroll.json().deviceId;
+  atoken = (await ctx.app.inject({ method: 'POST', url: '/api/admin/login', payload: { username: 'root', password: 'secret123' } })).json().token;
+  ctx.fcm.sent.length = 0;
+});
+afterAll(() => ctx.dispose());
+const admin = () => ({ authorization: `Bearer ${atoken}` });
+
+describe('ring/locate', () => {
+  it('ring → fcm.send(RING) 호출', async () => {
+    const res = await ctx.app.inject({ method: 'POST', url: `/api/admin/devices/${deviceId}/ring`, headers: admin() });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ queued: true });
+    expect(ctx.fcm.sent).toEqual([{ token: 'FCM-1', cmd: { type: 'RING' } }]);
+  });
+  it('locate → fcm.send(LOCATE_NOW)', async () => {
+    await ctx.app.inject({ method: 'POST', url: `/api/admin/devices/${deviceId}/locate`, headers: admin() });
+    expect(ctx.fcm.sent).toEqual([{ token: 'FCM-1', cmd: { type: 'LOCATE_NOW' } }]);
+  });
+  it('없는 기기 → 404', async () => {
+    const res = await ctx.app.inject({ method: 'POST', url: `/api/admin/devices/99999/ring`, headers: admin() });
+    expect(res.statusCode).toBe(404);
+  });
+});
