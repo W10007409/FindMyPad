@@ -4,6 +4,7 @@ import { and, desc, eq, ilike, inArray, isNull, or } from 'drizzle-orm';
 import { devices, users, checkouts, reports } from '../../db/schema.js';
 import { requireAdmin } from '../../plugins/auth-admin.js';
 import { resolveIndoorLocation } from '../../services/location.js';
+import { NotFoundError } from '../../errors.js';
 
 async function latestReport(db: FastifyInstance['deps']['db'], deviceId: number) {
   const [r] = await db.select().from(reports).where(eq(reports.deviceId, deviceId)).orderBy(desc(reports.reportedAt)).limit(1);
@@ -67,4 +68,15 @@ export function registerAdminDeviceRoutes(app: FastifyInstance) {
     const indoor = await resolveIndoorLocation(db, recentReports[0]?.bssid ?? null);
     return { device, currentUser, indoor, recentReports, history };
   });
+
+  async function sendCmd(id: number, type: 'RING' | 'LOCATE_NOW') {
+    const [d] = await db.select().from(devices).where(eq(devices.id, id)).limit(1);
+    if (!d) throw new NotFoundError('device not found');
+    if (d.fcmToken) await app.deps.fcm.send(d.fcmToken, { type });
+    return { queued: true as const };
+  }
+  app.post('/api/admin/devices/:id/ring', { preHandler: requireAdmin(app) },
+    async (req) => sendCmd(Number((req.params as { id: string }).id), 'RING'));
+  app.post('/api/admin/devices/:id/locate', { preHandler: requireAdmin(app) },
+    async (req) => sendCmd(Number((req.params as { id: string }).id), 'LOCATE_NOW'));
 }
