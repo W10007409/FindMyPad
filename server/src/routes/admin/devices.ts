@@ -20,7 +20,7 @@ async function activeUser(db: FastifyInstance['deps']['db'], deviceId: number) {
 export function registerAdminDeviceRoutes(app: FastifyInstance) {
   const db = app.deps.db;
 
-  app.get('/api/admin/devices', { preHandler: requireAdmin(app) }, async (req) => {
+  app.get('/api/admin/devices', { preHandler: requireAdmin(app, ['admin']) }, async (req) => {
     const q = (z.object({ q: z.string().optional() }).parse(req.query).q ?? '').trim();
     const like = `%${q}%`;
 
@@ -55,7 +55,7 @@ export function registerAdminDeviceRoutes(app: FastifyInstance) {
     return { items };
   });
 
-  app.get('/api/admin/devices/:id', { preHandler: requireAdmin(app) }, async (req) => {
+  app.get('/api/admin/devices/:id', { preHandler: requireAdmin(app, ['admin']) }, async (req) => {
     const id = Number((req.params as { id: string }).id);
     const [device] = await db.select().from(devices).where(eq(devices.id, id)).limit(1);
     const recentReports = await db.select().from(reports).where(eq(reports.deviceId, id)).orderBy(desc(reports.reportedAt)).limit(20);
@@ -75,8 +75,8 @@ export function registerAdminDeviceRoutes(app: FastifyInstance) {
     if (d.fcmToken) await app.deps.fcm.send(d.fcmToken, { type });
     return { queued: true as const };
   }
-  app.post('/api/admin/devices/:id/ring', { preHandler: requireAdmin(app) },
+  app.post('/api/admin/devices/:id/ring', { preHandler: requireAdmin(app, ['admin']) },
     async (req) => sendCmd(Number((req.params as { id: string }).id), 'RING'));
-  app.post('/api/admin/devices/:id/locate', { preHandler: requireAdmin(app) },
+  app.post('/api/admin/devices/:id/locate', { preHandler: requireAdmin(app, ['admin']) },
     async (req) => sendCmd(Number((req.params as { id: string }).id), 'LOCATE_NOW'));
 }

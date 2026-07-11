@@ -17,7 +17,7 @@ function parseCsv(csv: string): Array<{ bssid: string; building?: string; floor?
 }
 
 export function registerApMapRoutes(app: FastifyInstance) {
-  app.put('/api/admin/ap-map', { preHandler: requireAdmin(app) }, async (req) => {
+  app.put('/api/admin/ap-map', { preHandler: requireAdmin(app, ['admin']) }, async (req) => {
     const { csv } = Body.parse(req.body);
     const rows = parseCsv(csv);
     for (const r of rows) {
