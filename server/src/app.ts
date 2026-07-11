@@ -7,6 +7,7 @@ import { registerAdminAuthRoutes } from './routes/admin/auth.js';
 import { registerDeviceRoutes } from './routes/devices.js';
 import { registerReportRoutes } from './routes/reports.js';
 import { registerCheckoutRoutes } from './routes/checkouts.js';
+import { registerAdminDeviceRoutes } from './routes/admin/devices.js';
 
 export interface AppDeps { config: Config; db: DbClient; fcm: FcmSender; }
 
@@ -18,6 +19,7 @@ export function buildApp(deps: AppDeps): FastifyInstance {
   registerDeviceRoutes(app);
   registerReportRoutes(app);
   registerCheckoutRoutes(app);
+  registerAdminDeviceRoutes(app);
   app.get('/health', async () => ({ status: 'ok' }));
   return app;
 }
