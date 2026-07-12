@@ -3,18 +3,13 @@ package com.wjtb.padtracker.ui.enrollment
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.wjtb.padtracker.core.DeviceControl
+import com.wjtb.padtracker.data.Enrollable
 import com.wjtb.padtracker.data.api.ApiResult
-import com.wjtb.padtracker.data.api.EnrollResponse
 import com.wjtb.padtracker.ui.UiState
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.launch
-
-/** Narrow interface EnrollmentViewModel depends on, so it never needs the concrete PadRepository. */
-fun interface Enrollable {
-  suspend fun enroll(serial: String, model: String?, wifiMac: String?, fcmToken: String?): ApiResult<EnrollResponse>
-}
 
 /**
  * Runs the device onboarding sequence:

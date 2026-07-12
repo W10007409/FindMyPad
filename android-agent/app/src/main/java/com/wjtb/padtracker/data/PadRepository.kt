@@ -3,8 +3,6 @@ import com.wjtb.padtracker.data.api.*
 import com.wjtb.padtracker.data.queue.ReportQueue
 import com.wjtb.padtracker.data.queue.flushQueue
 import com.wjtb.padtracker.domain.*
-import com.wjtb.padtracker.ui.checkout.Checkoutable
-import com.wjtb.padtracker.ui.enrollment.Enrollable
 
 class PadRepository(
   private val api: PadApi,
