@@ -10,6 +10,8 @@ class ReportWorker(appContext: Context, params: WorkerParameters) : CoroutineWor
       container.repository.flushQueue()
       container.repository.sendReport(SnapshotCollector(applicationContext).collect())
       Result.success()
+    } catch (e: kotlinx.coroutines.CancellationException) {
+      throw e
     } catch (e: Exception) { Result.retry() }
   }
 }
