@@ -58,7 +58,7 @@ private fun AppNav(container: AppContainer) {
   }
 
   val enrollmentViewModel: EnrollmentViewModel =
-    viewModel { EnrollmentViewModel(container.deviceControl, container.repository) }
+    viewModel { EnrollmentViewModel(container.deviceControl, container.repository, container.pushService) }
   val checkoutViewModel: CheckoutViewModel =
     viewModel { CheckoutViewModel(container.repository, clock = Clock { java.time.Instant.now().toString() }) }
   val homeViewModel: HomeViewModel =
