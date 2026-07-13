@@ -14,5 +14,13 @@
         <receiver android:name=".work.BootReceiver" android:exported="true">
             <intent-filter><action android:name="android.intent.action.BOOT_COMPLETED"/></intent-filter>
         </receiver>
+        <activity android:name=".ui.MainActivity" android:exported="true">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
+        </activity>
+        <activity android:name=".ui.ring.RingActivity" android:exported="false"
+            android:showWhenLocked="true" android:turnScreenOn="true"/>
     </application>
 </manifest>
