@@ -11,7 +11,7 @@ data class ReportEntity(@PrimaryKey(autoGenerate = true) val id: Long = 0, val p
   @Query("SELECT * FROM report_queue ORDER BY id ASC") suspend fun all(): List<ReportEntity>
   @Query("DELETE FROM report_queue WHERE id = :id") suspend fun delete(id: Long)
 }
-@Database(entities = [ReportEntity::class], version = 1)
+@Database(entities = [ReportEntity::class], version = 1, exportSchema = false)
 abstract class QueueDb : RoomDatabase() { abstract fun dao(): ReportQueueDao }
 
 class RoomReportQueue(private val dao: ReportQueueDao) : ReportQueue {
