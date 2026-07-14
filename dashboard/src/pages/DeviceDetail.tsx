@@ -15,7 +15,8 @@ export function DeviceDetail() {
   const [toast, setToast] = useState<string | null>(null);
   function notify(msg: string) { setToast(msg); setTimeout(() => setToast(null), 2500); }
   if (isLoading) return <p className="p-4">불러오는 중…</p>;
-  if (isError || !data) return <p className="p-4 text-red-600">기기를 찾을 수 없습니다</p>;
+  if (Number.isNaN(deviceId)) return <p className="p-4 text-red-600">기기를 찾을 수 없습니다</p>;
+  if (isError || !data?.device) return <p className="p-4 text-red-600">기기를 찾을 수 없습니다</p>;
   const latest = data.recentReports[0];
   return (
     <div className="mx-auto max-w-3xl space-y-4 p-4">
