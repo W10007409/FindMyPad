@@ -1,6 +1,7 @@
 package com.wjtb.padtracker
 import android.content.Context
 import androidx.room.Room
+import com.wjtb.padtracker.core.AdminActivation
 import com.wjtb.padtracker.core.DeviceControl
 import com.wjtb.padtracker.core.PushService
 import com.wjtb.padtracker.data.*
@@ -16,6 +17,7 @@ class AppContainer(context: Context) {
   val repository = PadRepository(api, store, queue)
   val deviceControl: DeviceControl = provideDeviceControl(context) // 플레이버 바인딩
   val pushService: PushService = providePushService()               // 플레이버 바인딩
+  val adminActivation: AdminActivation = provideAdminActivation()   // 플레이버 바인딩
   private fun runBlockingToken(): String? =
     kotlinx.coroutines.runBlocking { store.deviceToken() }
 }

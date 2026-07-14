@@ -69,6 +69,7 @@ private fun AppNav(container: AppContainer) {
     Screen.Enrollment -> EnrollmentScreen(
       viewModel = enrollmentViewModel,
       onEnrolled = { screen = Screen.Home },
+      adminActivation = container.adminActivation,
     )
     Screen.Home -> HomeScreen(
       viewModel = homeViewModel,

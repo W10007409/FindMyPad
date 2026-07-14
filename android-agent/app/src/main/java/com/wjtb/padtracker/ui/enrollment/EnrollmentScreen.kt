@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.wjtb.padtracker.core.AdminActivation
 import com.wjtb.padtracker.ui.UiState
 
 /**
@@ -27,9 +28,14 @@ import com.wjtb.padtracker.ui.UiState
 fun EnrollmentScreen(
   viewModel: EnrollmentViewModel,
   onEnrolled: () -> Unit,
+  adminActivation: AdminActivation,
   modifier: Modifier = Modifier,
 ) {
   val uiState by viewModel.uiState.collectAsState()
+  val context = androidx.compose.ui.platform.LocalContext.current
+  val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
+    androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
+  ) { viewModel.enroll() }   // after returning from the admin prompt, proceed to enroll
 
   Column(
     modifier = modifier.fillMaxSize().padding(24.dp),
@@ -53,7 +59,14 @@ fun EnrollmentScreen(
     if (uiState is UiState.Success) {
       Button(onClick = onEnrolled) { Text("홈으로 이동") }
     } else {
-      Button(onClick = { viewModel.enroll() }, enabled = uiState !is UiState.Loading) {
+      Button(
+        onClick = {
+          val intent = adminActivation.activationIntent(context)
+          if (!adminActivation.isActive(context) && intent != null) launcher.launch(intent)
+          else viewModel.enroll()
+        },
+        enabled = uiState !is UiState.Loading,
+      ) {
         Text("등록 시작")
       }
     }
