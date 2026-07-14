@@ -6,6 +6,7 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.os.Build
 import android.util.Log
+import androidx.core.content.ContextCompat
 import com.samsung.android.knox.AppIdentity
 import com.samsung.android.knox.EnterpriseDeviceManager
 import com.samsung.android.knox.application.ApplicationPolicy
@@ -43,7 +44,12 @@ class KnoxDeviceControl(
                         }
                     }
                 }
-                context.registerReceiver(receiver, IntentFilter(KnoxEnterpriseLicenseManager.ACTION_LICENSE_STATUS))
+                ContextCompat.registerReceiver(
+                    context,
+                    receiver,
+                    IntentFilter(KnoxEnterpriseLicenseManager.ACTION_LICENSE_STATUS),
+                    ContextCompat.RECEIVER_EXPORTED,
+                )
                 cont.invokeOnCancellation { runCatching { context.unregisterReceiver(receiver) } }
                 try {
                     KnoxEnterpriseLicenseManager.getInstance(context).activateLicense(licenseKey)
