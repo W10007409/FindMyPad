@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
   id("com.android.application")
   id("org.jetbrains.kotlin.android")
@@ -9,6 +11,13 @@ plugins {
 if (file("google-services.json").exists()) {
   apply(plugin = "com.google.gms.google-services")
 }
+
+// Knox Premium Emulation (KPE) license key — read from local.properties, defaults to "" so the
+// build still succeeds without it (only required at runtime for KPE activation).
+val kpeLicenseKey: String = Properties().apply {
+  val f = rootProject.file("local.properties")
+  if (f.exists()) f.inputStream().use { load(it) }
+}.getProperty("KPE_LICENSE_KEY", "")
 android {
   namespace = "com.wjtb.padtracker"
   compileSdk = 34
@@ -23,7 +32,10 @@ android {
   flavorDimensions += "target"
   productFlavors {
     create("dev") { dimension = "target" }
-    create("knox") { dimension = "target" }
+    create("knox") {
+      dimension = "target"
+      buildConfigField("String", "KPE_LICENSE_KEY", "\"$kpeLicenseKey\"")
+    }
   }
   buildFeatures { compose = true; buildConfig = true }
   compileOptions { sourceCompatibility = JavaVersion.VERSION_17; targetCompatibility = JavaVersion.VERSION_17 }
@@ -57,6 +69,7 @@ dependencies {
   implementation("com.google.android.gms:play-services-location:21.3.0")
   implementation(platform("com.google.firebase:firebase-bom:33.3.0"))
   implementation("com.google.firebase:firebase-messaging")
+  "knoxImplementation"(files("libs/knoxsdk.jar"))
   testImplementation("junit:junit:4.13.2")
   testImplementation("org.jetbrains.kotlinx:kotlinx-coroutines-test:1.8.1")
   testImplementation("app.cash.turbine:turbine:1.1.0")
