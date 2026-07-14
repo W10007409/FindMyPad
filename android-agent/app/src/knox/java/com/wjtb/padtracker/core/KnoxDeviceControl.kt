@@ -75,13 +75,13 @@ class KnoxDeviceControl(
     }
 
     override fun grantPermissionsSilently(perms: List<String>): Boolean = try {
-        EnterpriseDeviceManager.getInstance(context).applicationPolicy
+        val result = EnterpriseDeviceManager.getInstance(context).applicationPolicy
             .applyRuntimePermissions(
                 AppIdentity(pkg, null),
                 perms,
                 ApplicationPolicy.PERMISSION_POLICY_STATE_GRANT,
             )
-        true
+        result == ApplicationPolicy.ERROR_NONE
     } catch (e: Exception) {
         Log.w(TAG, "grantPermissionsSilently failed", e); false
     }
