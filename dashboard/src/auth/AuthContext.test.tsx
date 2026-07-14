@@ -10,7 +10,7 @@ beforeEach(() => localStorage.clear());
 
 test('RequireAuth redirects to /login when no token', () => {
   render(
-    <MemoryRouter initialEntries={['/secret']}>
+    <MemoryRouter initialEntries={['/secret']} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <AuthProvider>
         <Routes>
           <Route path="/login" element={<div>login page</div>} />
@@ -22,7 +22,7 @@ test('RequireAuth redirects to /login when no token', () => {
 });
 
 test('login stores token via client.setToken', () => {
-  render(<MemoryRouter><AuthProvider><LoginProbe /></AuthProvider></MemoryRouter>);
+  render(<MemoryRouter future={{ v7_startTransition: true, v7_relativeSplatPath: true }}><AuthProvider><LoginProbe /></AuthProvider></MemoryRouter>);
   act(() => { screen.getByText('login').click(); });
   expect(getToken()).toBe('TOK');
 });

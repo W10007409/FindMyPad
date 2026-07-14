@@ -1,14 +1,19 @@
 # pad-tracker dashboard (P3)
 
 관리자용 렌탈 패드 검색/추적 대시보드. React 18 + Vite + TypeScript + Tailwind + TanStack Query + react-leaflet.
-P1 서버(`../server`)의 admin API를 소비한다(서버 코드는 이 프로젝트에서 변경하지 않음).
+P1 서버의 admin API를 소비한다(서버 코드는 이 프로젝트에서 변경하지 않음).
 
 ## 로컬 기동
 
-### 1) P1 서버 먼저 기동 (`../server`에서)
+### 1) P1 서버 먼저 기동 (레포 루트(`..`)에서)
+
+P1 서버의 `package.json`, `docker-compose.yml`은 `server/`가 아니라 레포 루트에 있다
+(`server/`에는 `src/`, `test/`만 있다). `dashboard/`에서 시작한다면 먼저 레포 루트로 이동한다.
 
 ```bash
+cd ..
 docker compose up -d db
+pnpm install
 pnpm db:migrate
 pnpm seed:admin root secret123 admin
 pnpm dev

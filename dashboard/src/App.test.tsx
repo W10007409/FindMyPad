@@ -19,7 +19,7 @@ beforeEach(() => localStorage.clear());
 function renderApp(entries: string[]) {
   return render(
     <QueryClientProvider client={makeClient()}>
-      <MemoryRouter initialEntries={entries}>
+      <MemoryRouter initialEntries={entries} future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
         <AuthProvider>
           <AppRoutes />
         </AuthProvider>
