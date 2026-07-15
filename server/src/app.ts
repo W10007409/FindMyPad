@@ -13,8 +13,8 @@ import { registerAlertRoutes } from './routes/admin/alerts.js';
 
 export interface AppDeps { config: Config; db: DbClient; fcm: FcmSender; }
 
-export function buildApp(deps: AppDeps): FastifyInstance {
-  const app = Fastify({ logger: false, trustProxy: deps.config.TRUST_PROXY });
+export function buildApp(deps: AppDeps, opts: { logger?: boolean } = {}): FastifyInstance {
+  const app = Fastify({ logger: opts.logger ?? false, trustProxy: deps.config.TRUST_PROXY });
   app.decorate('deps', deps);
   registerErrorHandler(app);
   registerAdminAuthRoutes(app);

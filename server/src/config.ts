@@ -7,6 +7,7 @@ const EnvSchema = z.object({
   STALE_DAYS: z.coerce.number().default(7),
   CORP_SSIDS: z.string().default(''),
   TRUST_PROXY: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
+  FIREBASE_SERVICE_ACCOUNT: z.string().optional(),
 });
 export type Config = z.infer<typeof EnvSchema>;
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): Config {
