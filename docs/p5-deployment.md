@@ -86,9 +86,9 @@ docker compose --env-file .env.prod -f docker-compose.prod.yml exec server \
    서빙하는 경우 §2 참고 — `/api`만 서버로, 나머지는 대시보드 `dist/`로 라우팅).
 3. `X-Forwarded-For`, `X-Forwarded-Proto` 헤더를 프록시가 전달하도록 설정.
 4. 서버 쪽 `.env.prod`의 `TRUST_PROXY=true`(이미 `.env.prod.example` 기본값)로 위 헤더를 신뢰하게
-   한다 — `server/src/app.ts`가 `Fastify({ trustProxy: config.TRUST_PROXY })`로 이를 사용해 기기
-   보고(`reports`)의 `public_ip`를 프록시 IP가 아닌 **실제 클라이언트 IP**로 기록한다. `TRUST_PROXY`가
-   `false`(또는 프록시가 헤더를 전달하지 않음)면 모든 요청이 프록시의 IP로 잘못 기록된다.
+   한다 — `server/src/app.ts`의 `buildApp`이 `Fastify({ logger: false, trustProxy: deps.config.TRUST_PROXY })`로
+   이를 사용해 기기 보고(`reports`)의 `public_ip`를 프록시 IP가 아닌 **실제 클라이언트 IP**로 기록한다.
+   `TRUST_PROXY`가 `false`(또는 프록시가 헤더를 전달하지 않음)면 모든 요청이 프록시의 IP로 잘못 기록된다.
 
 Nginx 예시(참고용 — 사내 표준 프록시 설정을 우선):
 
@@ -102,6 +102,12 @@ location /health {
   proxy_pass http://server:3000/health;
 }
 ```
+
+> `server:3000`은 리버스 프록시 컨테이너가 **compose 네트워크 내부**에 있을 때만 resolve된다(compose
+> 서비스 DNS 이름). §1.4에서 다루는 **사내(외부) 리버스 프록시** 케이스처럼 프록시가 compose 네트워크
+> **밖**에 있다면(그래서 `server`를 호스트 포트 `3000:3000`으로 노출하는 것) `proxy_pass`는 대신 도커
+> 호스트의 주소/호스트명과 노출된 포트를 가리켜야 한다(예: `http://<docker-host>:3000/api/`) —
+> `server:3000` 형태를 그대로 쓰면 프록시가 이름을 resolve하지 못한다.
 
 배포 완료 확인: 프록시를 통해 `https://<도메인>/health` → `{"status":"ok"}`, 그리고 아무 기기든
 보고를 하나 발생시킨 뒤 DB의 `reports.public_ip`(또는 관리자 기기 상세 화면)가 프록시 IP가 아닌
@@ -137,9 +143,18 @@ cron(또는 사내 백업 인프라)으로 매일 실행:
   exec -T db pg_dump -U pad padtracker | gzip > /backup/padtracker_$(date +\%Y\%m\%d).sql.gz
 ```
 
-`pad`/`padtracker`는 `.env.prod`의 `POSTGRES_USER`/`POSTGRES_DB`와 일치시킨다. 백업 파일은
-`/backup`(사내 백업 스토리지 마운트) 등 컨테이너/repo 외부에 보관하고, 오래된 백업은 별도 로테이션
-정책으로 정리한다. 복구는 `docker compose exec -T db psql -U pad padtracker < dump.sql`(gzip 해제 후).
+`pad`/`padtracker`는 `.env.prod`의 `POSTGRES_USER`/`POSTGRES_DB`와 일치시킨다(위 백업 커맨드도 이
+값에서 온 것 — 다르게 설정했다면 `-U`/DB명을 맞춰야 한다). 백업 파일은 `/backup`(사내 백업 스토리지
+마운트) 등 컨테이너/repo 외부에 보관하고, 오래된 백업은 별도 로테이션 정책으로 정리한다. 복구는 다른
+`docker compose` 명령과 동일하게 `--env-file .env.prod -f docker-compose.prod.yml`을 반드시 포함해야
+한다(생략하면 repo의 DEV `docker-compose.yml`을 기본으로 사용하는데, 거기에도 `db` 서비스가 있어
+잘못된 스택을 대상으로 하게 된다):
+
+```bash
+docker compose --env-file .env.prod -f docker-compose.prod.yml exec -T db psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" < dump.sql
+```
+
+(gzip 해제 후 실행)
 
 **로그**
 
