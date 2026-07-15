@@ -30,4 +30,18 @@ describe('ring/locate', () => {
     const res = await ctx.app.inject({ method: 'POST', url: `/api/admin/devices/99999/ring`, headers: admin() });
     expect(res.statusCode).toBe(404);
   });
+  it('fcmToken 없는 기기 → ring은 200이지만 queued:false, reason:no_token', async () => {
+    const enroll = await ctx.app.inject({ method: 'POST', url: '/api/devices/enroll', payload: { serial: 'S2' } });
+    const noTokenDeviceId = enroll.json().deviceId;
+    const res = await ctx.app.inject({ method: 'POST', url: `/api/admin/devices/${noTokenDeviceId}/ring`, headers: admin() });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ queued: false, reason: 'no_token' });
+    expect(ctx.fcm.sent).toEqual([]);
+  });
+  it('fcm.send 실패 → ring은 200이지만 queued:false, reason:send_failed', async () => {
+    ctx.fcm.send = async () => { throw new Error('boom'); };
+    const res = await ctx.app.inject({ method: 'POST', url: `/api/admin/devices/${deviceId}/ring`, headers: admin() });
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual({ queued: false, reason: 'send_failed' });
+  });
 });

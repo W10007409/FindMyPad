@@ -69,11 +69,17 @@ export function registerAdminDeviceRoutes(app: FastifyInstance) {
     return { device, currentUser, indoor, recentReports, history };
   });
 
-  async function sendCmd(id: number, type: 'RING' | 'LOCATE_NOW') {
+  async function sendCmd(id: number, type: 'RING' | 'LOCATE_NOW'): Promise<{ queued: boolean; reason?: 'no_token' | 'send_failed' }> {
     const [d] = await db.select().from(devices).where(eq(devices.id, id)).limit(1);
     if (!d) throw new NotFoundError('device not found');
-    if (d.fcmToken) await app.deps.fcm.send(d.fcmToken, { type });
-    return { queued: true as const };
+    if (!d.fcmToken) return { queued: false, reason: 'no_token' };
+    try {
+      await app.deps.fcm.send(d.fcmToken, { type });
+      return { queued: true };
+    } catch (e) {
+      app.log.warn({ err: e, deviceId: id, type }, 'fcm send failed');
+      return { queued: false, reason: 'send_failed' };
+    }
   }
   app.post('/api/admin/devices/:id/ring', { preHandler: requireAdmin(app, ['admin']) },
     async (req) => sendCmd(Number((req.params as { id: string }).id), 'RING'));
