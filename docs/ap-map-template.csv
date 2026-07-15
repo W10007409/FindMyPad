@@ -1,0 +1,4 @@
+bssid,building,floor,zone,note
+AA:BB:CC:DD:EE:01,본관,3,동측,정문 근처
+AA:BB:CC:DD:EE:02,본관,3,서측,
+AA:BB:CC:DD:EE:03,별관,1,로비,안내데스크
