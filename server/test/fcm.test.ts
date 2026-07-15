@@ -47,4 +47,24 @@ describe('createFcmSender', () => {
     const sender = createFcmSender(config);
     expect(sender).toBeInstanceOf(StubFcmSender);
   });
+
+  it('FIREBASE_SERVICE_ACCOUNT가 존재하지 않는 파일 경로면 부팅이 죽지 않고 StubFcmSender로 폴백', () => {
+    const config = loadConfig({
+      DATABASE_URL: 'x',
+      JWT_SECRET: '0123456789abcdef',
+      FIREBASE_SERVICE_ACCOUNT: '/nonexistent/does-not-exist-sa.json',
+    });
+    const sender = createFcmSender(config);
+    expect(sender).toBeInstanceOf(StubFcmSender);
+  });
+
+  it('FIREBASE_SERVICE_ACCOUNT가 손상된 JSON 내용이면 경로로 취급되어 StubFcmSender로 폴백', () => {
+    const config = loadConfig({
+      DATABASE_URL: 'x',
+      JWT_SECRET: '0123456789abcdef',
+      FIREBASE_SERVICE_ACCOUNT: '{not json',
+    });
+    const sender = createFcmSender(config);
+    expect(sender).toBeInstanceOf(StubFcmSender);
+  });
 });
