@@ -25,7 +25,7 @@
 | # | 준비물 | 확인 방법 |
 |---|---|---|
 | 1 | Knox 파트너 계정 | 파트너 포털 로그인 가능 |
-| 2 | KPE 라이선스 키(파일럿 = **KPE Standard 상용 키**로 전환 완료) | 개발 키가 아닌 상용 키인지 재확인(`docs/p5-prerequisites.md` §2) |
+| 2 | KPE 라이선스 키(파일럿 = **상용(운영)용 KPE Standard 키(무료 티어)**로 전환 완료) | 개발 키가 아닌 상용(운영)용 키인지 재확인(`docs/p5-prerequisites.md` §2) |
 | 3 | 앱 서명 keystore | 파일 존재 + 비밀번호 사내 시크릿 저장소 보관 + `git status`에 미노출 |
 | 4 | 서버 인프라(도메인·HTTPS·리버스 프록시) | 인프라팀 티켓 완료 |
 | 5 | Firebase(`google-services.json` + 서비스계정 JSON) | 두 파일 모두 배치 확인 |
@@ -148,7 +148,11 @@ cd android-agent
    실내위치(`indoor` — AP매핑 조인 결과), 마지막 보고(`recentReports[0]`), 배터리
    (`recentReports[0].batteryPct`)가 모두 표시되는지 확인.
 3. **벨 울리기** — 상세 화면에서 벨 울리기 버튼 → `POST /api/admin/devices/:id/ring` → 대상 기기가
-   FCM `RING` 메시지를 수신해 벨소리를 울리는지 확인(§8 수용 기준 ②의 사전 리허설).
+   FCM `RING` 메시지를 수신해 벨소리를 울리는지 확인(§8 수용 기준 ②의 사전 리허설). **주의**: 이
+   배포 베이스(`main`)의 서버는 `StubFcmSender`(인메모리 no-op, `server/src/services/fcm.ts`)를
+   쓰므로 이 호출은 `{queued:true}`만 반환할 뿐 실제 푸시를 보내지 않는다 — 벨소리 확인은 실 FCM
+   발송 로직이 배포된 뒤에만 가능하다(`docs/p5-prerequisites.md` §5 참고). 그 전까지는 이 단계를
+   생략하거나 "미구현으로 보류"로 기록한다.
 4. **상세 지도** — 기기 상세의 지도 뷰에서 최근 보고의 `lat`/`lng`(네트워크 좌표, 보조 신호) 및
    AP매핑 기반 실내위치(건물/층/구역, 1차 신뢰 소스)가 함께 표시되는지 확인.
 
@@ -161,14 +165,24 @@ cd android-agent
 
 파일럿 착수 후 최소 1주간 아래를 매일 점검한다(`docs/p5-deployment.md` §1.5 운영 절차 그대로 사용):
 
+> **NOTE**: 이 배포 베이스(main의 P1 서버)는 `Fastify({ logger: false })`로 빌드된다
+> (`server/src/app.ts`) — 스케줄러의 `app.log.info(...)` 출력(`retention purged N reports`,
+> `stale devices: N`)은 컨테이너 로그에 **나타나지 않는다**(마이그레이션 로그·`listening on ...`은
+> `console.log`라 정상 출력됨). 아래 stale/retention 점검은 로그 grep이 아니라 API/DB로 직접
+> 확인한다.
+
 - **주기 보고 도달**: 각 기기가 예정된 주기로 보고를 보내고 있는지 — 대시보드 기기 목록의
   `lastSeenAt`이 갱신되고 있는지 확인.
-- **무응답 기기(stale devices)**: `GET /api/admin/alerts/stale?days=7`(기본 `STALE_DAYS`)을 매일
-  조회 — 서버가 매일 09:00 자동 스캔하지만 결과는 로그에만 남으므로, 이 API를 대시보드에서 조회하거나
-  직접 `curl`로 확인해 실제 대응(연락·회수)을 트리거해야 한다.
+- **무응답 기기(stale devices)**: `GET /api/admin/alerts/stale?days=7`(기본 `STALE_DAYS`, 관리자
+  Bearer 토큰 필요)을 매일 직접 조회한다 — 서버가 매일 09:00 자동 스캔하지만 위 NOTE대로 결과가
+  로그에 남지 않으므로, 반드시 이 API를 대시보드에서 조회하거나 직접 `curl`로 호출해 실제 대응
+  (연락·회수)을 트리거해야 한다.
 - **배터리**: 기기 목록의 `batteryPct`를 육안 점검(자동 알림 없음 — P5 범위 밖).
-- **retention**: 매일 03:00 자동 배치(`RETENTION_DAYS`, 기본 90일 이상 지난 보고 삭제) — 로그의
-  `retention purged N reports`로 실행 확인. 파일럿 1주 기간 중에는 삭제 대상이 없는 것이 정상.
+- **retention**: 매일 03:00 자동 배치(`RETENTION_DAYS`, 기본 90일 이상 지난 보고 삭제) — 이 빌드는
+  로그로 실행 여부를 확인할 방법이 없다(`retention purged N reports`는 `logger:false`에서 출력
+  안 됨). DB에서 `RETENTION_DAYS`보다 오래된 `reports` 행이 없는지 쿼리하는 등 간접 확인으로
+  대체하거나, 후속 조치로 프로덕션 로거 활성화를 고려한다. 파일럿 1주 기간 중에는 삭제 대상이 없는
+  것이 정상이므로 이 기간에는 확인 우선순위가 낮다.
 
 | 일자 | 주기 보고 정상 대수 | stale 기기 수 | 배터리 이슈 | 비고 |
 |---|---|---|---|---|
@@ -203,6 +217,13 @@ cd android-agent
 등).
 
 ### ② 벨 울리기 도달률(Wi-Fi 연결 기기) 95%+
+
+> **주의**: 이 기준은 서버가 실제로 FCM을 발송해야 측정 가능하다. 현재 배포 베이스(`main`의 P1
+> 서버)는 `server/src/server.ts`에서 `new StubFcmSender()`(인메모리 no-op,
+> `server/src/services/fcm.ts`)를 쓰므로 `ring`/`locate` 호출이 `{queued:true}`를 반환해도 실제
+> 기기로 푸시가 가지 않는다 — 이 기준은 `firebase-admin` 기반 실 FCM 발송 로직(`FIREBASE_SERVICE_ACCOUNT`
+> 소비, 아직 미구현인 서버 측 필수 후속 작업)이 배포되기 전까지 **측정 불가**하다(`docs/p5-prerequisites.md`
+> §5 참고).
 
 - **측정 방법**: 파일럿 기기 중 **사내 Wi-Fi에 연결된 상태**의 기기를 대상으로
   `POST /api/admin/devices/:id/ring`을 호출하고, 해당 기기에서 실제 벨소리가 울리는지 확인. 파일럿

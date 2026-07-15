@@ -27,8 +27,12 @@ cp .env.prod.example .env.prod
 `DATABASE_URL=postgres://pad:<POSTGRES_PASSWORD와 동일값>@db:5432/padtracker` — 사용자명(`pad`)·DB명
 (`padtracker`)은 `POSTGRES_USER`/`POSTGRES_DB`와 일치해야 한다. `FIREBASE_SERVICE_ACCOUNT`가 가리키는
 경로(기본값 `/run/secrets/firebase-service-account.json`)에 Firebase 서비스계정 JSON을 배치한다
-(발급 절차는 `docs/p5-prerequisites.md` §5). `TRUST_PROXY=true`, `PORT=3000`은 기본값 그대로 둔다
-(§1.4 참고).
+(발급 절차는 `docs/p5-prerequisites.md` §5). **다만 이 값은 아직 서버가 읽지 않는다** — 이 배포
+베이스(main)는 `server/src/server.ts`에서 `new StubFcmSender()`(인메모리 no-op,
+`server/src/services/fcm.ts`)로 고정 배선돼 있고 저장소 어디에도 `FIREBASE_SERVICE_ACCOUNT`를
+소비하는 코드가 없다 — 이 env 키는 `firebase-admin` 기반 실 FCM 발송 로직(아직 미구현, 서버 측 필수
+후속 작업)이 배포된 뒤 쓰일 자리를 미리 예약해 둔 것이다. `TRUST_PROXY=true`, `PORT=3000`은 기본값
+그대로 둔다(§1.4 참고).
 
 ### 1.2 기동
 
@@ -117,16 +121,25 @@ location /health {
 
 **모니터링**
 
-- **무응답 기기(stale devices)**: `GET /api/admin/alerts/stale?days=<N>`(관리자 인증 필요, 기본
-  `days`는 `STALE_DAYS` env, 기본 7일) — `server/src/routes/admin/alerts.ts`. 대시보드 또는
-  `curl`/모니터링 스크립트로 주기 조회해 며칠간 보고가 없는 기기를 확인한다. 서버는 이 스캔을
-  **매일 09:00에도 자동 실행**하지만(`server/src/jobs/scheduler.ts`) 그 결과는 알림 발송 없이
-  **로그에만 기록**되므로(`stale devices: N`), 실제 대응(연락·회수)은 이 API를 대시보드에서 조회하거나
-  서버 로그를 관제하는 사람이 트리거해야 한다.
+> **NOTE (로그 미출력 주의)**: 프로덕션 서버는 `Fastify({ logger: false, ... })`로 빌드된다
+> (`server/src/app.ts`). 마이그레이션 로그와 `listening on ...`(서버 기동)는 `console.log`를 쓰므로
+> 정상 출력되지만, 스케줄러(`server/src/jobs/scheduler.ts`)의 `app.log.info(...)` 호출
+> (`retention purged N reports`, `stale devices: N`)은 Fastify 로거를 경유하므로 `logger:false`
+> 상태에서는 **아무 출력도 없다**. 아래 두 배치는 컨테이너 로그를 grep해서는 확인할 수 없다 — API나
+> DB로 직접 확인해야 한다.
+
+- **무응답 기기(stale devices)**: `GET /api/admin/alerts/stale?days=<N>`(관리자 Bearer 토큰 필요,
+  기본 `days`는 `STALE_DAYS` env, 기본 7일) — `server/src/routes/admin/alerts.ts`. 대시보드 또는
+  `curl`/모니터링 스크립트로 **이 API를 직접 호출**해 며칠간 보고가 없는 기기를 확인한다. 서버는
+  이 스캔을 매일 09:00에도 자동 실행하지만(`server/src/jobs/scheduler.ts`), 위 NOTE대로 결과가
+  로그에 남지 않으므로 로그를 봐서는 확인할 수 없다 — 실제 대응(연락·회수)은 이 API를 주기 호출하는
+  사람/스크립트가 트리거해야 한다.
 - **retention 배치**: 매일 03:00에 `RETENTION_DAYS`(기본 90일)보다 오래된 보고(`reports`)를 자동
   삭제(`purgeOldReports`, `server/src/jobs/scheduler.ts`). 별도 cron 설정 불필요 — 서버 프로세스
-  내장 스케줄러(`node-cron`)가 컨테이너 기동 중 자동 실행한다. 로그에서
-  `retention purged N reports`로 실행 여부를 확인할 수 있다.
+  내장 스케줄러(`node-cron`)가 컨테이너 기동 중 자동 실행한다. 다만 이 빌드는 실행 여부를 **로그로
+  확인할 방법이 없다**(`retention purged N reports`는 `logger:false`에서 출력되지 않음) — DB에서
+  `RETENTION_DAYS`보다 오래된 `reports` 행이 남아있지 않은지 쿼리하는 등 간접 확인으로 대체하거나,
+  후속 조치로 프로덕션 로거를 활성화(`Fastify({ logger: true })` 또는 pino 설정)하는 것을 고려한다.
 - **배터리**: 관리자 기기 목록/상세 API(`GET /api/admin/devices`, `GET /api/admin/devices/:id`)의
   `batteryPct` 필드(최근 보고 기준)를 대시보드에서 주기 확인. 별도 알림 배치는 없음 — 파일럿 기간
   중 대시보드 목록을 육안 점검하거나, 필요 시 위 stale 알림과 동일한 패턴으로 배터리 임계치 스캔을

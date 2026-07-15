@@ -123,18 +123,27 @@
   프로젝트 설정 → 서비스 계정 → **새 비공개 키 생성**으로 서비스계정 JSON을 발급 → 서버 배포 시
   `.env.prod`의 `FIREBASE_SERVICE_ACCOUNT`가 가리키는 경로(예: `/run/secrets/firebase-service-account.json`,
   `.env.prod.example` 기본값)에 배치.
+- **서버측 미구현(교차 브랜치 주의)**: 위 서비스계정 JSON을 배치해도, 이 파일럿 배포 베이스
+  (`main`)의 서버는 아직 이를 소비하지 않는다 — `server/src/server.ts`는
+  `new StubFcmSender()`(인메모리 no-op, `server/src/services/fcm.ts`)를 사용하며, 저장소 어디에도
+  `FIREBASE_SERVICE_ACCOUNT`를 읽는 코드가 없다. 즉 이 파일을 배치해도 `ring`/`locate` 호출은
+  `{queued:true}`만 반환할 뿐 실제 푸시가 발송되지 않는다. `firebase-admin` 기반 실 FCM 발송 로직
+  구현은 **서버 측 필수 후속 작업(아직 미구현)**이며, 파일럿에서 실제 벨울리기가 동작하려면 이
+  작업이 먼저 배포돼야 한다.
 - **소요**: 프로젝트 생성·앱 등록·키 발급 모두 수 분 내 완료(Firebase 콘솔 자가서비스).
 - **필요 시점**: P2 시점에 FCM 스텁 동작 확인용으로 있으면 좋지만 필수는 아님(스텁으로 개발 가능).
-  **실제 벨울리기가 동작해야 하는 시점은 P5 파일럿 착수 전** — 두 파일 모두 필요.
+  **실제 벨울리기가 동작해야 하는 시점은 P5 파일럿 착수 전** — 두 파일 모두 필요하되, 위 서버측
+  미구현 캐비앗대로 서버의 실 FCM 발송 로직도 함께 배포되어야 한다.
 - **담당**: 앱 담당(`google-services.json`) + 서버/인프라 담당(서비스계정 JSON 배치, 시크릿 관리).
 - **교차 참조**: `.env.prod.example`의 `FIREBASE_SERVICE_ACCOUNT=/run/secrets/firebase-service-account.json`,
   `.gitignore`의 `**/google-services.json`·`**/FIREBASE_SERVICE_ACCOUNT*.json`·
   `*firebase*serviceaccount*.json` 항목(둘 다 커밋 금지 대상으로 이미 등록됨).
 
 - [ ] 완료 기준: `android-agent/app/google-services.json` 배치 후 `assembleKnoxRelease`(또는
-      `assembleKnoxDebug`)가 `google-services` 플러그인 적용 상태로 빌드 성공. 서버가
-      `FIREBASE_SERVICE_ACCOUNT` 경로에서 서비스계정 JSON을 읽어 실제 기기로 FCM 발송 성공(로그에
-      전송 성공 응답 확인).
+      `assembleKnoxDebug`)가 `google-services` 플러그인 적용 상태로 빌드 성공. 서버 쪽은 서비스계정
+      JSON을 배치해 두는 것까지가 이 준비물의 완료 기준이다 — **서버가 실제로 그 파일을 읽어 FCM을
+      발송하는지는 위 서버측 미구현 캐비앗대로 현재 검증 불가**(`StubFcmSender`만 배선돼 있음). 실
+      FCM 발송 로직이 배포된 뒤에 재확인한다.
 
 ---
 
