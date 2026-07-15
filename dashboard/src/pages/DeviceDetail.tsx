@@ -1,10 +1,18 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useDeviceDetail, useLocate, useRing } from '../api/hooks';
+import type { RingResult } from '../api/types';
 import { DeviceMap } from '../components/DeviceMap';
 import { Battery } from '../components/Battery';
 import { LastSeen } from '../components/LastSeen';
 import { Toast } from '../components/Toast';
+
+export function ringMessage(action: 'ring' | 'locate', r: RingResult): string {
+  if (r.queued) return action === 'ring' ? '벨울리기 전송됨' : '위치 요청 전송됨';
+  if (r.reason === 'no_token') return '이 기기는 FCM 토큰이 없어 전송할 수 없습니다';
+  if (r.reason === 'send_failed') return '전송 실패 — 잠시 후 다시 시도하세요';
+  return '전송 실패';
+}
 
 export function DeviceDetail() {
   const { id } = useParams();
@@ -30,8 +38,8 @@ export function DeviceDetail() {
           </p>
         </div>
         <div className="flex gap-2">
-          <button onClick={() => ring.mutate(deviceId, { onSuccess: () => notify('벨울리기 전송됨') })} className="rounded bg-blue-600 px-3 py-2 text-white">벨 울리기</button>
-          <button onClick={() => locate.mutate(deviceId, { onSuccess: () => notify('위치 요청 전송됨') })} className="rounded border px-3 py-2">지금 위치 요청</button>
+          <button onClick={() => ring.mutate(deviceId, { onSuccess: (data) => notify(ringMessage('ring', data)) })} className="rounded bg-blue-600 px-3 py-2 text-white">벨 울리기</button>
+          <button onClick={() => locate.mutate(deviceId, { onSuccess: (data) => notify(ringMessage('locate', data)) })} className="rounded border px-3 py-2">지금 위치 요청</button>
         </div>
       </div>
       <DeviceMap lat={latest?.lat ?? null} lng={latest?.lng ?? null} indoor={data.indoor} />

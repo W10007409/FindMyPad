@@ -1,6 +1,6 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiFetch } from './client';
-import type { DeviceDetail, DeviceListItem, StaleItem } from './types';
+import type { DeviceDetail, DeviceListItem, RingResult, StaleItem } from './types';
 
 export function useLogin() {
   return useMutation({
@@ -21,6 +21,6 @@ export function useDeviceDetail(id: number) {
 export function useStaleDevices(days: number) {
   return useQuery({ queryKey: ['stale', days], queryFn: async () => (await apiFetch<{ items: StaleItem[] }>(`/admin/alerts/stale?days=${days}`)).items });
 }
-export function useRing() { return useMutation({ mutationFn: (id: number) => apiFetch<{ queued: true }>(`/admin/devices/${id}/ring`, { method: 'POST' }) }); }
-export function useLocate() { return useMutation({ mutationFn: (id: number) => apiFetch<{ queued: true }>(`/admin/devices/${id}/locate`, { method: 'POST' }) }); }
+export function useRing() { return useMutation({ mutationFn: (id: number) => apiFetch<RingResult>(`/admin/devices/${id}/ring`, { method: 'POST' }) }); }
+export function useLocate() { return useMutation({ mutationFn: (id: number) => apiFetch<RingResult>(`/admin/devices/${id}/locate`, { method: 'POST' }) }); }
 export function useApMapUpload() { return useMutation({ mutationFn: (csv: string) => apiFetch<{ upserted: number }>('/admin/ap-map', { method: 'PUT', body: JSON.stringify({ csv }) }) }); }

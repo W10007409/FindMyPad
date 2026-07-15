@@ -14,3 +14,4 @@ export interface HistoryItem { id: number; empNo: string; name: string;
 export interface DeviceDetail { device: DeviceRow; currentUser: CurrentUser | null; indoor: Indoor | null;
   recentReports: Report[]; history: HistoryItem[] }
 export interface StaleItem { id: number; serial: string; assetNo: string | null; lastSeenAt: string | null }
+export interface RingResult { queued: boolean; reason?: 'no_token' | 'send_failed'; }

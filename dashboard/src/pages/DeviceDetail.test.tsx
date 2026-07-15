@@ -23,6 +23,29 @@ test('ring button triggers request and shows sent notice', async () => {
   await userEvent.click(screen.getByRole('button', { name: /벨 울리기/ }));
   await waitFor(() => expect(screen.getByText(/전송됨/)).toBeInTheDocument());
 });
+test('ring button shows no_token message when device has no FCM token', async () => {
+  server.use(
+    http.post('*/api/admin/devices/:id/ring', () =>
+      HttpResponse.json({ queued: false, reason: 'no_token' })
+    )
+  );
+  setup();
+  await waitFor(() => screen.getByText('홍길동'));
+  await userEvent.click(screen.getByRole('button', { name: /벨 울리기/ }));
+  await waitFor(() => expect(screen.getByText(/FCM 토큰이 없어/)).toBeInTheDocument());
+  expect(screen.queryByText(/^벨울리기 전송됨$/)).not.toBeInTheDocument();
+});
+test('ring button shows send_failed message when delivery fails', async () => {
+  server.use(
+    http.post('*/api/admin/devices/:id/ring', () =>
+      HttpResponse.json({ queued: false, reason: 'send_failed' })
+    )
+  );
+  setup();
+  await waitFor(() => screen.getByText('홍길동'));
+  await userEvent.click(screen.getByRole('button', { name: /벨 울리기/ }));
+  await waitFor(() => expect(screen.getByText(/전송 실패/)).toBeInTheDocument());
+});
 test('shows not-found instead of crashing when server returns 200 with no device', async () => {
   server.use(
     http.get('*/api/admin/devices/:id', () =>
