@@ -1,11 +1,17 @@
 import { useMutation, useQuery } from '@tanstack/react-query';
 import { apiFetch } from './client';
-import type { DeviceDetail, DeviceListItem, RingResult, StaleItem } from './types';
+import type { DeviceDetail, DeviceListItem, LoginResponse, RingResult, StaleItem } from './types';
 
 export function useLogin() {
   return useMutation({
-    mutationFn: (b: { username: string; password: string }) =>
-      apiFetch<{ token: string }>('/admin/login', { method: 'POST', body: JSON.stringify(b) }),
+    mutationFn: (b: { empNo: string; password: string }) =>
+      apiFetch<LoginResponse>('/admin/login', { method: 'POST', body: JSON.stringify(b) }),
+  });
+}
+export function useChangePassword() {
+  return useMutation({
+    mutationFn: (b: { currentPassword: string; newPassword: string }) =>
+      apiFetch<{ ok: true }>('/auth/change-password', { method: 'POST', body: JSON.stringify(b) }),
   });
 }
 export function useSearchDevices(q: string) {
@@ -13,6 +19,13 @@ export function useSearchDevices(q: string) {
     queryKey: ['devices', q],
     queryFn: async () => (await apiFetch<{ items: DeviceListItem[] }>(`/admin/devices?q=${encodeURIComponent(q)}`)).items,
     enabled: q.length > 0,
+  });
+}
+/** Employee home: GET /admin/devices with no query → the server returns the caller's own pads. */
+export function useMyDevices() {
+  return useQuery({
+    queryKey: ['my-devices'],
+    queryFn: async () => (await apiFetch<{ items: DeviceListItem[] }>(`/admin/devices`)).items,
   });
 }
 export function useDeviceDetail(id: number) {

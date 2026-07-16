@@ -4,7 +4,10 @@ import { beforeEach, expect, test } from 'vitest';
 import { AuthProvider, RequireAuth, useAuth } from './AuthContext';
 import { getToken } from '../api/client';
 
-function LoginProbe() { const { login } = useAuth(); return <button onClick={() => login('TOK')}>login</button>; }
+function LoginProbe() {
+  const { login } = useAuth();
+  return <button onClick={() => login('TOK', { role: 'admin', name: '관리자', empNo: 'root', mustChangePassword: false })}>login</button>;
+}
 
 beforeEach(() => localStorage.clear());
 

@@ -16,3 +16,4 @@ export interface DeviceDetail { device: DeviceRow; currentUser: CurrentUser | nu
   recentReports: Report[]; history: HistoryItem[] }
 export interface StaleItem { id: number; serial: string; assetNo: string | null; lastSeenAt: string | null }
 export interface RingResult { queued: boolean; reason?: 'no_token' | 'send_failed'; }
+export interface LoginResponse { token: string; role: 'admin' | 'employee'; name: string; empNo: string; mustChangePassword: boolean }

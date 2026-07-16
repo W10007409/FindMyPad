@@ -1,8 +1,10 @@
 import { http, HttpResponse } from 'msw';
 export const handlers = [
   http.post('*/api/admin/login', async ({ request }) => {
-    const b = (await request.json()) as { username: string; password: string };
-    if (b.password === 'good') return HttpResponse.json({ token: 'TOK-OK' });
+    const b = (await request.json()) as { empNo?: string; username?: string; password: string };
+    if (b.password === 'good') {
+      return HttpResponse.json({ token: 'TOK-OK', role: 'admin', name: '관리자', empNo: b.empNo ?? b.username ?? 'root', mustChangePassword: false });
+    }
     return new HttpResponse('{"error":{"code":"UNAUTHORIZED"}}', { status: 401 });
   }),
   http.get('*/api/admin/devices', ({ request }) => {

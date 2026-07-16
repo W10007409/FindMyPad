@@ -21,7 +21,7 @@ function setup() {
 
 test('successful login stores token and navigates home', async () => {
   setup();
-  await userEvent.type(screen.getByLabelText(/아이디/), 'root');
+  await userEvent.type(screen.getByLabelText(/사번/), 'root');
   await userEvent.type(screen.getByLabelText(/비밀번호/), 'good');
   await userEvent.click(screen.getByRole('button', { name: /로그인/ }));
   await waitFor(() => expect(screen.getByText('홈')).toBeInTheDocument());
@@ -29,7 +29,7 @@ test('successful login stores token and navigates home', async () => {
 });
 test('failed login shows error', async () => {
   setup();
-  await userEvent.type(screen.getByLabelText(/아이디/), 'root');
+  await userEvent.type(screen.getByLabelText(/사번/), 'root');
   await userEvent.type(screen.getByLabelText(/비밀번호/), 'bad');
   await userEvent.click(screen.getByRole('button', { name: /로그인/ }));
   await waitFor(() => expect(screen.getByText(/로그인 실패/)).toBeInTheDocument());

@@ -7,6 +7,17 @@ export class ApiError extends Error {
 }
 export function getToken(): string | null { return localStorage.getItem(TOKEN_KEY); }
 export function setToken(t: string | null): void { if (t) localStorage.setItem(TOKEN_KEY, t); else localStorage.removeItem(TOKEN_KEY); }
+
+const SESSION_KEY = 'pad_session';
+export interface Session { role: 'admin' | 'employee'; name: string; empNo: string; mustChangePassword: boolean }
+export function getSession(): Session | null {
+  const raw = localStorage.getItem(SESSION_KEY);
+  if (!raw) return null;
+  try { return JSON.parse(raw) as Session; } catch { return null; }
+}
+export function setSession(s: Session | null): void {
+  if (s) localStorage.setItem(SESSION_KEY, JSON.stringify(s)); else localStorage.removeItem(SESSION_KEY);
+}
 export function setUnauthorizedHandler(fn: (() => void) | null): void { onUnauthorized = fn; }
 
 async function safeJson(res: Response): Promise<unknown> { try { return await res.json(); } catch { return null; } }

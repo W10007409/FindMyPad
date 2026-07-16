@@ -1,18 +1,29 @@
 import { screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
-import { expect, test } from 'vitest';
+import { expect, test, beforeEach } from 'vitest';
 import { http, HttpResponse } from 'msw';
 import { Routes, Route } from 'react-router-dom';
 import { renderWithProviders } from '../test/utils';
 import { server } from '../test/setup';
+import { AuthProvider } from '../auth/AuthContext';
+import { setSession, setToken } from '../api/client';
 import { SearchHome } from './SearchHome';
+
+// SearchHome branches on role: these cases exercise the admin search UI.
+beforeEach(() => {
+  localStorage.clear();
+  setToken('T');
+  setSession({ role: 'admin', name: '관리자', empNo: 'root', mustChangePassword: false });
+});
 
 test('search shows result card', async () => {
   renderWithProviders(
-    <Routes>
-      <Route path="/" element={<SearchHome />} />
-      <Route path="/devices/:id" element={<div>상세</div>} />
-    </Routes>);
+    <AuthProvider>
+      <Routes>
+        <Route path="/" element={<SearchHome />} />
+        <Route path="/devices/:id" element={<div>상세</div>} />
+      </Routes>
+    </AuthProvider>);
   await userEvent.type(screen.getByPlaceholderText(/이름.*사번/), 'hong');
   await waitFor(() => expect(screen.getByText('홍길동')).toBeInTheDocument());
   expect(screen.getByText(/본관/)).toBeInTheDocument();
@@ -32,10 +43,12 @@ test('unenrolled asset (id null) shows 미등록 chip and does not navigate on c
     )
   );
   renderWithProviders(
-    <Routes>
-      <Route path="/" element={<SearchHome />} />
-      <Route path="/devices/:id" element={<div>상세</div>} />
-    </Routes>);
+    <AuthProvider>
+      <Routes>
+        <Route path="/" element={<SearchHome />} />
+        <Route path="/devices/:id" element={<div>상세</div>} />
+      </Routes>
+    </AuthProvider>);
   await userEvent.type(screen.getByPlaceholderText(/이름.*사번/), '이은영');
   await waitFor(() => expect(screen.getByText('이은영')).toBeInTheDocument());
   expect(screen.getByText(/032022000216/)).toBeInTheDocument();

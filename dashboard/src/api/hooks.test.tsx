@@ -20,7 +20,7 @@ test('useStaleDevices returns items', async () => {
 });
 test('useLogin returns token', async () => {
   const { result } = renderHook(() => useLogin(), { wrapper: wrap() });
-  result.current.mutate({ username: 'root', password: 'good' });
+  result.current.mutate({ empNo: 'root', password: 'good' });
   await waitFor(() => expect(result.current.isSuccess).toBe(true));
   expect(result.current.data!.token).toBe('TOK-OK');
 });

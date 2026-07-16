@@ -36,7 +36,7 @@ test('unauthenticated visit to / redirects to login', () => {
 test('after login, search home is reachable', async () => {
   const user = userEvent.setup();
   renderApp(['/login']);
-  await user.type(screen.getByLabelText(/아이디/), 'root');
+  await user.type(screen.getByLabelText(/사번/), 'root');
   await user.type(screen.getByLabelText(/비밀번호/), 'good');
   await user.click(screen.getByRole('button', { name: /로그인/ }));
   await waitFor(() =>
