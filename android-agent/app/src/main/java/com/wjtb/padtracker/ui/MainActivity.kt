@@ -51,10 +51,15 @@ private sealed interface Screen {
 private fun AppNav(container: AppContainer) {
   var screen by remember { mutableStateOf<Screen?>(null) }
   val scope = rememberCoroutineScope()
+  val context = androidx.compose.ui.platform.LocalContext.current
 
   // Decide Enrollment vs Home once, based on whether this device already has a token.
   LaunchedEffect(Unit) {
-    screen = if (container.store.deviceToken() == null) Screen.Enrollment else Screen.Home
+    val enrolled = container.store.deviceToken() != null
+    screen = if (enrolled) Screen.Home else Screen.Enrollment
+    // Opening the app is a foreground context, so it's safe to (re)start the always-on
+    // reporting service here — this covers the case where the OS killed it while away.
+    if (enrolled) com.wjtb.padtracker.work.ReportingService.start(context)
   }
 
   val enrollmentViewModel: EnrollmentViewModel =
@@ -68,7 +73,10 @@ private fun AppNav(container: AppContainer) {
     null -> Box(Modifier.fillMaxSize(), contentAlignment = Alignment.Center) { CircularProgressIndicator() }
     Screen.Enrollment -> EnrollmentScreen(
       viewModel = enrollmentViewModel,
-      onEnrolled = { screen = Screen.Home },
+      onEnrolled = {
+        com.wjtb.padtracker.work.ReportingService.start(context) // begin always-on tracking right after enroll
+        screen = Screen.Home
+      },
       adminActivation = container.adminActivation,
     )
     Screen.Home -> HomeScreen(
