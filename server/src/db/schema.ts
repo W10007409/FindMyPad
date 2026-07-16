@@ -56,6 +56,21 @@ export const reports = pgTable('reports', {
   byDeviceTime: index('reports_device_time').on(t.deviceId, t.reportedAt.desc()),
 }));
 
+export const assets = pgTable('assets', {
+  serial: text('serial').primaryKey(),
+  assetNo: text('asset_no').unique(),
+  sapNo: text('sap_no'),
+  model: text('model'),
+  ownerName: text('owner_name'),
+  ownerEmpNo: text('owner_emp_no'),
+  org1: text('org1'),
+  org2: text('org2'),
+  location: text('location'),
+  status: text('status'),
+  issuedAt: text('issued_at'),
+  note: text('note'),
+});
+
 export const apMap = pgTable('ap_map', {
   bssid: text('bssid').primaryKey(),
   building: text('building'),

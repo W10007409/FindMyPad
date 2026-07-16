@@ -10,6 +10,7 @@ import { registerCheckoutRoutes } from './routes/checkouts.js';
 import { registerAdminDeviceRoutes } from './routes/admin/devices.js';
 import { registerApMapRoutes } from './routes/admin/ap-map.js';
 import { registerAlertRoutes } from './routes/admin/alerts.js';
+import { registerAssetRoutes } from './routes/admin/assets.js';
 
 export interface AppDeps { config: Config; db: DbClient; fcm: FcmSender; }
 
@@ -24,6 +25,7 @@ export function buildApp(deps: AppDeps, opts: { logger?: boolean } = {}): Fastif
   registerAdminDeviceRoutes(app);
   registerApMapRoutes(app);
   registerAlertRoutes(app);
+  registerAssetRoutes(app);
   app.get('/health', async () => ({ status: 'ok' }));
   return app;
 }

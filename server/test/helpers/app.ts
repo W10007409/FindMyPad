@@ -13,7 +13,7 @@ export function makeTestApp() {
   // so tests may add ad-hoc routes and assert on a clean StubFcmSender.
   async function truncate() {
     await app.close();
-    await db.execute(sql`truncate table reports, checkouts, ap_map, users, devices, admin_users restart identity cascade`);
+    await db.execute(sql`truncate table reports, checkouts, ap_map, assets, users, devices, admin_users restart identity cascade`);
     fcm = new StubFcmSender();
     app = buildApp({ config, db, fcm });
   }
