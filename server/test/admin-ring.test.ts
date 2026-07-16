@@ -22,6 +22,17 @@ describe('ring/locate', () => {
     expect(res.json()).toEqual({ queued: true });
     expect(ctx.fcm.sent).toEqual([{ token: 'FCM-1', cmd: { type: 'RING' } }]);
   });
+  it('ring → 배정된 자산 있으면 대여자 이름·부서를 payload에 포함', async () => {
+    await ctx.app.inject({
+      method: 'PUT', url: '/api/admin/assets', headers: admin(),
+      payload: { rows: [{ serial: 'S1', assetNo: 'A-1', ownerName: '이은영', org1: 'AX연구소', org2: '서비스기획팀' }] },
+    });
+    const res = await ctx.app.inject({ method: 'POST', url: `/api/admin/devices/${deviceId}/ring`, headers: admin() });
+    expect(res.statusCode).toBe(200);
+    expect(ctx.fcm.sent).toEqual([
+      { token: 'FCM-1', cmd: { type: 'RING', ownerName: '이은영', ownerDept: '서비스기획팀' } },
+    ]);
+  });
   it('locate → fcm.send(LOCATE_NOW)', async () => {
     await ctx.app.inject({ method: 'POST', url: `/api/admin/devices/${deviceId}/locate`, headers: admin() });
     expect(ctx.fcm.sent).toEqual([{ token: 'FCM-1', cmd: { type: 'LOCATE_NOW' } }]);

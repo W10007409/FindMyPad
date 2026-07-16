@@ -6,6 +6,7 @@ import type { DbClient } from '../../db/client.js';
 import { requireAdmin } from '../../plugins/auth-admin.js';
 import { resolveIndoorLocation } from '../../services/location.js';
 import { NotFoundError } from '../../errors.js';
+import type { FcmCommand } from '../../services/fcm.js';
 
 type Device = typeof devices.$inferSelect;
 type Asset = typeof assets.$inferSelect;
@@ -137,8 +138,16 @@ export function registerAdminDeviceRoutes(app: FastifyInstance) {
     const [d] = await db.select().from(devices).where(eq(devices.id, id)).limit(1);
     if (!d) throw new NotFoundError('device not found');
     if (!d.fcmToken) return { queued: false, reason: 'no_token' };
+    const cmd: FcmCommand = { type };
+    if (type === 'RING') {
+      // Attach the assigned renter so the ring screen shows whose pad it is.
+      const [a] = await db.select().from(assets).where(eq(assets.serial, d.serial)).limit(1);
+      if (a?.ownerName) cmd.ownerName = a.ownerName;
+      const dept = a?.org2 ?? a?.org1;
+      if (dept) cmd.ownerDept = dept;
+    }
     try {
-      await app.deps.fcm.send(d.fcmToken, { type });
+      await app.deps.fcm.send(d.fcmToken, cmd);
       return { queued: true };
     } catch (e) {
       app.log.warn({ err: e, deviceId: id, type }, 'fcm send failed');

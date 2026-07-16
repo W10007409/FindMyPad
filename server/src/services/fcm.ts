@@ -7,7 +7,7 @@ import { cert, getApp, getApps, initializeApp, type ServiceAccount } from 'fireb
 import { getMessaging } from 'firebase-admin/messaging';
 import type { Config } from '../config.js';
 
-export type FcmCommand = { type: 'RING' | 'LOCATE_NOW' };
+export type FcmCommand = { type: 'RING' | 'LOCATE_NOW'; ownerName?: string; ownerDept?: string };
 export interface FcmSender { send(token: string, cmd: FcmCommand): Promise<void>; }
 export class StubFcmSender implements FcmSender {
   readonly sent: { token: string; cmd: FcmCommand }[] = [];
@@ -29,7 +29,12 @@ export interface FcmMessagingClient {
 export class FirebaseFcmSender implements FcmSender {
   constructor(private readonly messaging: FcmMessagingClient) {}
   async send(token: string, cmd: FcmCommand): Promise<void> {
-    await this.messaging.send({ token, data: { command: cmd.type }, android: { priority: 'high' } });
+    // FCM data values must be strings; owner fields are included only for RING so the
+    // device's ring screen can show whose pad it is (found-pad → who to return it to).
+    const data: Record<string, string> = { command: cmd.type };
+    if (cmd.ownerName) data.ownerName = cmd.ownerName;
+    if (cmd.ownerDept) data.ownerDept = cmd.ownerDept;
+    await this.messaging.send({ token, data, android: { priority: 'high' } });
   }
 }
 
