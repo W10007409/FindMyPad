@@ -1,20 +1,88 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { and, desc, eq, ilike, inArray, isNull, or } from 'drizzle-orm';
-import { devices, users, checkouts, reports } from '../../db/schema.js';
+import { devices, users, checkouts, reports, assets } from '../../db/schema.js';
+import type { DbClient } from '../../db/client.js';
 import { requireAdmin } from '../../plugins/auth-admin.js';
 import { resolveIndoorLocation } from '../../services/location.js';
 import { NotFoundError } from '../../errors.js';
 
-async function latestReport(db: FastifyInstance['deps']['db'], deviceId: number) {
+type Device = typeof devices.$inferSelect;
+type Asset = typeof assets.$inferSelect;
+
+async function latestReport(db: DbClient, deviceId: number) {
   const [r] = await db.select().from(reports).where(eq(reports.deviceId, deviceId)).orderBy(desc(reports.reportedAt)).limit(1);
   return r ?? null;
 }
-async function activeUser(db: FastifyInstance['deps']['db'], deviceId: number) {
+async function activeUser(db: DbClient, deviceId: number) {
   const [row] = await db.select({ empNo: users.empNo, name: users.name, dept: users.dept })
     .from(checkouts).innerJoin(users, eq(checkouts.userId, users.id))
     .where(and(eq(checkouts.deviceId, deviceId), isNull(checkouts.returnedAt))).limit(1);
   return row ?? null;
+}
+
+/** 등록된(enrolled) device 한 건 → 검색 결과 item. 자산 대장에 매칭되는 행이 없을 때의 fallback. */
+async function enrolledDeviceItem(db: DbClient, d: Device) {
+  const rep = await latestReport(db, d.id);
+  const cu = await activeUser(db, d.id);
+  const indoor = await resolveIndoorLocation(db, rep?.bssid ?? null);
+  return {
+    id: d.id, serial: d.serial, assetNo: d.assetNo, model: d.model,
+    batteryPct: rep?.batteryPct ?? null, lastSeenAt: d.lastSeenAt,
+    lat: rep?.lat ?? null, lng: rep?.lng ?? null,
+    currentUser: cu, indoor,
+    org1: null as string | null, location: null as string | null, enrolled: true,
+  };
+}
+
+/** assets(개인별 지급 대장) 한 건 → 검색 결과 item. serial이 같은 enrolled device가 있으면 좌측 조인해 실시간 정보(배터리/위치)를 붙인다. */
+async function assetItem(db: DbClient, a: Asset, deviceBySerial: Map<string, Device>) {
+  const device = deviceBySerial.get(a.serial) ?? null;
+  const rep = device ? await latestReport(db, device.id) : null;
+  const indoor = await resolveIndoorLocation(db, rep?.bssid ?? null);
+  const currentUser = a.ownerEmpNo || a.ownerName
+    ? { empNo: a.ownerEmpNo, name: a.ownerName, dept: a.org2 }
+    : null;
+  return {
+    id: device?.id ?? null,
+    serial: a.serial,
+    assetNo: a.assetNo,
+    model: a.model ?? device?.model ?? null,
+    batteryPct: rep?.batteryPct ?? null,
+    lastSeenAt: device?.lastSeenAt ?? null,
+    lat: rep?.lat ?? null,
+    lng: rep?.lng ?? null,
+    indoor,
+    currentUser,
+    org1: a.org1,
+    location: a.location,
+    enrolled: !!device,
+  };
+}
+
+/** q(serial/자산번호/소유자명/사번)에 매칭되는 assets 행 조회 */
+async function matchedAssets(db: DbClient, like: string) {
+  return db.select().from(assets).where(or(
+    ilike(assets.serial, like),
+    ilike(assets.assetNo, like),
+    ilike(assets.ownerName, like),
+    ilike(assets.ownerEmpNo, like),
+  )).limit(100);
+}
+
+/** q(serial/자산번호/현재 대여자 이름·사번)에 매칭되는 enrolled devices 조회 — 기존 검색 로직 */
+async function matchedEnrolledDevices(db: DbClient, like: string) {
+  // q가 이름/사번과 매칭되는 활성 대여의 device_id 목록을 먼저 조회한다.
+  // (drizzle-orm 0.36.4에서 sql`${id} in (${subquery})` 패턴이 불안정하여 inArray 폴백을 사용)
+  const userMatchedRows = await db.select({ id: checkouts.deviceId }).from(checkouts)
+    .innerJoin(users, eq(checkouts.userId, users.id))
+    .where(and(isNull(checkouts.returnedAt), or(ilike(users.name, like), ilike(users.empNo, like))));
+  const userMatchedDeviceIds = userMatchedRows.map((r) => r.id).filter((id): id is number => id !== null);
+
+  const conditions = [ilike(devices.serial, like), ilike(devices.assetNo, like)];
+  if (userMatchedDeviceIds.length > 0) conditions.push(inArray(devices.id, userMatchedDeviceIds));
+
+  return db.select().from(devices).where(or(...conditions)).limit(100);
 }
 
 export function registerAdminDeviceRoutes(app: FastifyInstance) {
@@ -22,37 +90,31 @@ export function registerAdminDeviceRoutes(app: FastifyInstance) {
 
   app.get('/api/admin/devices', { preHandler: requireAdmin(app, ['admin']) }, async (req) => {
     const q = (z.object({ q: z.string().optional() }).parse(req.query).q ?? '').trim();
-    const like = `%${q}%`;
 
-    let rows;
-    if (q) {
-      // q가 이름/사번과 매칭되는 활성 대여의 device_id 목록을 먼저 조회한다.
-      // (drizzle-orm 0.36.4에서 sql`${id} in (${subquery})` 패턴이 불안정하여 inArray 폴백을 사용)
-      const userMatchedRows = await db.select({ id: checkouts.deviceId }).from(checkouts)
-        .innerJoin(users, eq(checkouts.userId, users.id))
-        .where(and(isNull(checkouts.returnedAt), or(ilike(users.name, like), ilike(users.empNo, like))));
-      const userMatchedDeviceIds = userMatchedRows.map((r) => r.id).filter((id): id is number => id !== null);
-
-      const conditions = [ilike(devices.serial, like), ilike(devices.assetNo, like)];
-      if (userMatchedDeviceIds.length > 0) conditions.push(inArray(devices.id, userMatchedDeviceIds));
-
-      rows = await db.select().from(devices).where(or(...conditions)).limit(100);
-    } else {
-      rows = await db.select().from(devices).limit(100);
+    if (!q) {
+      // q가 없으면 기존 동작 그대로: enrolled devices 전체(최대 100)를 반환한다.
+      const rows = await db.select().from(devices).limit(100);
+      const items = await Promise.all(rows.map((d) => enrolledDeviceItem(db, d)));
+      return { items };
     }
 
-    const items = await Promise.all(rows.map(async (d) => {
-      const rep = await latestReport(db, d.id);
-      const cu = await activeUser(db, d.id);
-      const indoor = await resolveIndoorLocation(db, rep?.bssid ?? null);
-      return {
-        id: d.id, serial: d.serial, assetNo: d.assetNo, model: d.model,
-        batteryPct: rep?.batteryPct ?? null, lastSeenAt: d.lastSeenAt,
-        lat: rep?.lat ?? null, lng: rep?.lng ?? null,
-        currentUser: cu, indoor,
-      };
-    }));
-    return { items };
+    const like = `%${q}%`;
+
+    // assets(개인별 지급 대장)가 검색의 주 소스: 아직 enroll되지 않은 단말도 결과에 포함된다.
+    const assetRows = await matchedAssets(db, like);
+    const assetSerials = new Set(assetRows.map((a) => a.serial));
+    const linkedDevices = assetSerials.size > 0
+      ? await db.select().from(devices).where(inArray(devices.serial, [...assetSerials]))
+      : [];
+    const deviceBySerial = new Map(linkedDevices.map((d) => [d.serial, d]));
+    const assetResultItems = await Promise.all(assetRows.map((a) => assetItem(db, a, deviceBySerial)));
+
+    // enrolled devices 중 assets에 매칭 행이 없는 것들(자산 대장 미등재)은 기존 checkout 기반 currentUser로 보강해 union한다.
+    const enrolledMatches = await matchedEnrolledDevices(db, like);
+    const fallbackDevices = enrolledMatches.filter((d) => !assetSerials.has(d.serial));
+    const fallbackItems = await Promise.all(fallbackDevices.map((d) => enrolledDeviceItem(db, d)));
+
+    return { items: [...assetResultItems, ...fallbackItems] };
   });
 
   app.get('/api/admin/devices/:id', { preHandler: requireAdmin(app, ['admin']) }, async (req) => {
@@ -66,7 +128,9 @@ export function registerAdminDeviceRoutes(app: FastifyInstance) {
       .where(eq(checkouts.deviceId, id)).orderBy(desc(checkouts.checkedOut)).limit(50);
     const currentUser = await activeUser(db, id);
     const indoor = await resolveIndoorLocation(db, recentReports[0]?.bssid ?? null);
-    return { device, currentUser, indoor, recentReports, history };
+    // serial이 일치하는 자산 대장 행이 있으면 배정된 소유자(asset) 정보도 함께 반환한다. (기존 필드는 그대로 유지)
+    const asset = device ? (await db.select().from(assets).where(eq(assets.serial, device.serial)).limit(1))[0] ?? null : null;
+    return { device, currentUser, indoor, recentReports, history, asset };
   });
 
   async function sendCmd(id: number, type: 'RING' | 'LOCATE_NOW'): Promise<{ queued: boolean; reason?: 'no_token' | 'send_failed' }> {
