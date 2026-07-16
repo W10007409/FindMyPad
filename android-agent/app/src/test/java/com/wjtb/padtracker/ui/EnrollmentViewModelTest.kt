@@ -70,6 +70,7 @@ class EnrollmentViewModelTest {
       override fun grantPermissionsSilently(perms: List<String>): Boolean = true
       override fun disableMacRandomization(ssid: String): Boolean = true
       override fun readSerial(): String? = "S1"
+      override val allowsManualSerial: Boolean = false
     }
     val vm = EnrollmentViewModel(
       deviceControl = failingDeviceControl,
@@ -91,6 +92,7 @@ class EnrollmentViewModelTest {
       override fun grantPermissionsSilently(perms: List<String>): Boolean = true
       override fun disableMacRandomization(ssid: String): Boolean = true
       override fun readSerial(): String? = null
+      override val allowsManualSerial: Boolean = false
     }
     val vm = EnrollmentViewModel(
       deviceControl = noSerialDeviceControl,
@@ -103,6 +105,73 @@ class EnrollmentViewModelTest {
       assertEquals(UiState.Loading, awaitItem())
       assertTrue(awaitItem() is UiState.Error)
     }
+  }
+
+  @Test fun manual_serial_override_is_forwarded_when_allowed() = runTest {
+    // MockDeviceControl.allowsManualSerial == true, so the typed serial wins over ANDROID-123.
+    var capturedSerial: String? = null
+    val vm = EnrollmentViewModel(
+      deviceControl = deviceControl,
+      enrollable = { serial, _, _, _ ->
+        capturedSerial = serial
+        ApiResult.Ok(EnrollResponse(1, "A-1", "DTOK"))
+      },
+      pushService = pushService,
+    )
+    vm.uiState.test {
+      assertEquals(UiState.Idle, awaitItem())
+      vm.enroll(serialOverride = "  R9TT306T78D  ")
+      assertEquals(UiState.Loading, awaitItem())
+      assertEquals(UiState.Success, awaitItem())
+    }
+    assertEquals("R9TT306T78D", capturedSerial)
+  }
+
+  @Test fun blank_serial_override_falls_back_to_device_serial() = runTest {
+    var capturedSerial: String? = null
+    val vm = EnrollmentViewModel(
+      deviceControl = deviceControl,
+      enrollable = { serial, _, _, _ ->
+        capturedSerial = serial
+        ApiResult.Ok(EnrollResponse(1, "A-1", "DTOK"))
+      },
+      pushService = pushService,
+    )
+    vm.uiState.test {
+      assertEquals(UiState.Idle, awaitItem())
+      vm.enroll(serialOverride = "   ")
+      assertEquals(UiState.Loading, awaitItem())
+      assertEquals(UiState.Success, awaitItem())
+    }
+    assertEquals("ANDROID-123", capturedSerial)
+  }
+
+  @Test fun serial_override_ignored_when_not_allowed() = runTest {
+    // Knox-like control: manual entry disabled, so readSerial() ("HW-SERIAL") is used.
+    val knoxLike = object : DeviceControl {
+      override suspend fun activateLicense(): Result<Unit> = Result.success(Unit)
+      override fun lockUninstall(): Boolean = true
+      override fun grantPermissionsSilently(perms: List<String>): Boolean = true
+      override fun disableMacRandomization(ssid: String): Boolean = true
+      override fun readSerial(): String? = "HW-SERIAL"
+      override val allowsManualSerial: Boolean = false
+    }
+    var capturedSerial: String? = null
+    val vm = EnrollmentViewModel(
+      deviceControl = knoxLike,
+      enrollable = { serial, _, _, _ ->
+        capturedSerial = serial
+        ApiResult.Ok(EnrollResponse(1, "A-1", "DTOK"))
+      },
+      pushService = pushService,
+    )
+    vm.uiState.test {
+      assertEquals(UiState.Idle, awaitItem())
+      vm.enroll(serialOverride = "TYPED-SHOULD-BE-IGNORED")
+      assertEquals(UiState.Loading, awaitItem())
+      assertEquals(UiState.Success, awaitItem())
+    }
+    assertEquals("HW-SERIAL", capturedSerial)
   }
 
   @Test fun enroll_forwards_push_token_to_enrollable() = runTest {

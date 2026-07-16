@@ -5,4 +5,5 @@ class MockDeviceControl(private val androidId: String) : DeviceControl {
   override fun grantPermissionsSilently(perms: List<String>): Boolean = true
   override fun disableMacRandomization(ssid: String): Boolean = true
   override fun readSerial(): String? = androidId
+  override val allowsManualSerial: Boolean = true
 }

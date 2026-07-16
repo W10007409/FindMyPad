@@ -11,4 +11,5 @@ class MockDeviceControlTest {
     assertTrue(dc.disableMacRandomization("CORP-WIFI"))
   }
   @Test fun readSerial_returns_androidId() { assertEquals("ANDROID-123", dc.readSerial()) }
+  @Test fun allows_manual_serial_in_dev() { assertTrue(dc.allowsManualSerial) }
 }

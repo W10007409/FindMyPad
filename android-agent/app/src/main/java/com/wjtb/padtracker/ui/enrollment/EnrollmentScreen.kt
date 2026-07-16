@@ -6,13 +6,18 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.Button
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -33,9 +38,12 @@ fun EnrollmentScreen(
 ) {
   val uiState by viewModel.uiState.collectAsState()
   val context = androidx.compose.ui.platform.LocalContext.current
+  // dev builds let the operator type the real serial (prefilled with the ANDROID_ID fallback);
+  // Knox ignores this and reads Build.getSerial(), so the field is hidden there.
+  var serial by rememberSaveable { mutableStateOf(viewModel.suggestedSerial) }
   val launcher = androidx.activity.compose.rememberLauncherForActivityResult(
     androidx.activity.result.contract.ActivityResultContracts.StartActivityForResult()
-  ) { viewModel.enroll() }   // after returning from the admin prompt, proceed to enroll
+  ) { viewModel.enroll(serialOverride = serial) }   // after returning from the admin prompt, proceed to enroll
 
   Column(
     modifier = modifier.fillMaxSize().padding(24.dp),
@@ -55,6 +63,17 @@ fun EnrollmentScreen(
       is UiState.Conflict -> Text("이미 등록된 기기입니다.")
       is UiState.Error -> Text("오류: ${s.msg}")
     }
+    if (viewModel.allowsManualSerial && uiState !is UiState.Success) {
+      Spacer(Modifier.height(16.dp))
+      OutlinedTextField(
+        value = serial,
+        onValueChange = { serial = it },
+        label = { Text("시리얼(제조번호)") },
+        singleLine = true,
+        enabled = uiState !is UiState.Loading,
+        modifier = Modifier.fillMaxWidth(),
+      )
+    }
     Spacer(Modifier.height(24.dp))
     if (uiState is UiState.Success) {
       Button(onClick = onEnrolled) { Text("홈으로 이동") }
@@ -63,7 +82,7 @@ fun EnrollmentScreen(
         onClick = {
           val intent = adminActivation.activationIntent(context)
           if (!adminActivation.isActive(context) && intent != null) launcher.launch(intent)
-          else viewModel.enroll()
+          else viewModel.enroll(serialOverride = serial)
         },
         enabled = uiState !is UiState.Loading,
       ) {

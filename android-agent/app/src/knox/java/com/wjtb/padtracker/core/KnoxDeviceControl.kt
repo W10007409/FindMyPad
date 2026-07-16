@@ -99,6 +99,9 @@ class KnoxDeviceControl(
         Log.w(TAG, "readSerial failed", e); null
     }
 
+    // Knox reads the real hardware serial via Build.getSerial(); no manual entry.
+    override val allowsManualSerial: Boolean = false
+
     companion object {
         private const val TAG = "KnoxDeviceControl"
         private const val LICENSE_TIMEOUT_MS = 30_000L

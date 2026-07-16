@@ -26,7 +26,18 @@ class EnrollmentViewModel(
   private val _uiState = MutableStateFlow<UiState>(UiState.Idle)
   val uiState: StateFlow<UiState> = _uiState.asStateFlow()
 
-  fun enroll(model: String? = null, wifiMac: String? = null) {
+  /** true when the screen should offer a manual serial text field (dev builds). */
+  val allowsManualSerial: Boolean = deviceControl.allowsManualSerial
+
+  /** Prefill for the manual serial field (dev: the ANDROID_ID fallback). Empty if unreadable. */
+  val suggestedSerial: String get() = deviceControl.readSerial().orEmpty()
+
+  /**
+   * @param serialOverride operator-entered serial; only honored on builds where
+   *   [allowsManualSerial] is true and the value is non-blank, otherwise the
+   *   device-reported serial ([DeviceControl.readSerial]) is used.
+   */
+  fun enroll(serialOverride: String? = null, model: String? = null, wifiMac: String? = null) {
     _uiState.value = UiState.Loading
     viewModelScope.launch {
       val license = deviceControl.activateLicense()
@@ -34,7 +45,8 @@ class EnrollmentViewModel(
         _uiState.value = UiState.Error(license.exceptionOrNull()?.message ?: "라이선스 활성화 실패")
         return@launch
       }
-      val serial = deviceControl.readSerial()
+      val manual = serialOverride?.trim()?.takeIf { it.isNotEmpty() && allowsManualSerial }
+      val serial = manual ?: deviceControl.readSerial()
       if (serial == null) {
         _uiState.value = UiState.Error("기기 시리얼을 읽을 수 없습니다")
         return@launch
