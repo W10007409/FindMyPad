@@ -10,7 +10,8 @@ export const handlers = [
     return HttpResponse.json({ items: q === 'none' ? [] : [{
       id: 1, serial: 'S1', assetNo: 'A-1', model: 'SM-X200', batteryPct: 55, lastSeenAt: '2026-07-13T00:00:00Z',
       lat: null, lng: null, currentUser: { empNo: 'E100', name: '홍길동', dept: '개발' },
-      indoor: { building: '본관', floor: '3', zone: '동측' } }] });
+      indoor: { building: '본관', floor: '3', zone: '동측' },
+      org1: '개발본부', location: '5층 동측', enrolled: true }] });
   }),
   http.get('*/api/admin/devices/:id', ({ params }) => HttpResponse.json({
     device: { id: Number(params.id), serial: 'S1', assetNo: 'A-1', model: 'SM-X200', wifiMac: null, knoxLicensed: false, enrolledAt: '2026-07-01T00:00:00Z', lastSeenAt: '2026-07-13T00:00:00Z' },

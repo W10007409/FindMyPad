@@ -1,9 +1,10 @@
 export interface Indoor { building: string | null; floor: string | null; zone: string | null }
 export interface CurrentUser { empNo: string; name: string; dept: string | null }
 export interface DeviceListItem {
-  id: number; serial: string; assetNo: string | null; model: string | null;
+  id: number | null; serial: string; assetNo: string | null; model: string | null;
   batteryPct: number | null; lastSeenAt: string | null; lat: number | null; lng: number | null;
   currentUser: CurrentUser | null; indoor: Indoor | null;
+  org1: string | null; location: string | null; enrolled: boolean;
 }
 export interface DeviceRow { id: number; serial: string; assetNo: string | null; model: string | null;
   wifiMac: string | null; knoxLicensed: boolean; enrolledAt: string | null; lastSeenAt: string | null }
