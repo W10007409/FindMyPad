@@ -10,6 +10,6 @@ export function requireAdmin(app: FastifyInstance, roles: Array<'admin' | 'emplo
     try { payload = verifyAdminJwt(auth.slice(7), app.deps.config.JWT_SECRET); }
     catch { throw new UnauthorizedError('invalid admin token'); }
     if (!roles.includes(payload.role)) throw new UnauthorizedError('insufficient role');
-    req.admin = { id: payload.sub, role: payload.role, username: payload.username };
+    req.admin = { id: payload.sub, role: payload.role, empNo: payload.empNo };
   };
 }

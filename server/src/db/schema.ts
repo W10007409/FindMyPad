@@ -20,6 +20,11 @@ export const users = pgTable('users', {
   name: text('name').notNull(),
   dept: text('dept'),
   email: text('email'),
+  // 사번 로그인 인증 컬럼. 임포트된 직원은 초기 비밀번호 1234 + 강제 변경으로 시드된다.
+  passwordHash: text('password_hash'),
+  mustChangePassword: boolean('must_change_password').notNull().default(true),
+  role: text('role', { enum: ['admin', 'employee'] }).notNull().default('employee'),
+  isActive: boolean('is_active').notNull().default(true),
 });
 
 export const adminUsers = pgTable('admin_users', {

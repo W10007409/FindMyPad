@@ -5,11 +5,30 @@ import { devices, users, checkouts, reports, assets } from '../../db/schema.js';
 import type { DbClient } from '../../db/client.js';
 import { requireAdmin } from '../../plugins/auth-admin.js';
 import { resolveIndoorLocation } from '../../services/location.js';
-import { NotFoundError } from '../../errors.js';
+import { NotFoundError, ForbiddenError } from '../../errors.js';
 import type { FcmCommand } from '../../services/fcm.js';
 
 type Device = typeof devices.$inferSelect;
 type Asset = typeof assets.$inferSelect;
+
+/** 사번(empNo)이 자산 대장에서 소유(owner)한 serial 집합. employee 스코핑의 기준. */
+async function ownedSerials(db: DbClient, empNo: string): Promise<Set<string>> {
+  const rows = await db.select({ serial: assets.serial }).from(assets).where(eq(assets.ownerEmpNo, empNo));
+  return new Set(rows.map((r) => r.serial));
+}
+
+/** admin이 아니면(=employee) 해당 deviceId가 본인 소유 자산인지 확인, 아니면 403. */
+async function assertCanAccessDevice(
+  db: DbClient,
+  admin: { role: 'admin' | 'employee'; empNo: string },
+  deviceId: number,
+): Promise<void> {
+  if (admin.role === 'admin') return;
+  const [d] = await db.select({ serial: devices.serial }).from(devices).where(eq(devices.id, deviceId)).limit(1);
+  if (!d) throw new NotFoundError('device not found');
+  const owned = await ownedSerials(db, admin.empNo);
+  if (!owned.has(d.serial)) throw new ForbiddenError('not your device');
+}
 
 async function latestReport(db: DbClient, deviceId: number) {
   const [r] = await db.select().from(reports).where(eq(reports.deviceId, deviceId)).orderBy(desc(reports.reportedAt)).limit(1);
@@ -89,11 +108,24 @@ async function matchedEnrolledDevices(db: DbClient, like: string) {
 export function registerAdminDeviceRoutes(app: FastifyInstance) {
   const db = app.deps.db;
 
-  app.get('/api/admin/devices', { preHandler: requireAdmin(app, ['admin']) }, async (req) => {
+  app.get('/api/admin/devices', { preHandler: requireAdmin(app, ['admin', 'employee']) }, async (req) => {
+    const admin = req.admin!;
     const q = (z.object({ q: z.string().optional() }).parse(req.query).q ?? '').trim();
 
+    // employee는 항상 본인 소유 자산으로 스코핑된다(q 유무 무관). 소유 자산이 없으면 빈 목록.
+    const scope = admin.role === 'employee' ? await ownedSerials(db, admin.empNo) : null;
+
     if (!q) {
-      // q가 없으면 기존 동작 그대로: enrolled devices 전체(최대 100)를 반환한다.
+      if (scope) {
+        // 내 패드 목록: 본인 소유 자산 전체(enroll 여부 무관).
+        const mine = await db.select().from(assets).where(eq(assets.ownerEmpNo, admin.empNo)).limit(100);
+        const linked = mine.length
+          ? await db.select().from(devices).where(inArray(devices.serial, mine.map((a) => a.serial)))
+          : [];
+        const bySerial = new Map(linked.map((d) => [d.serial, d]));
+        return { items: await Promise.all(mine.map((a) => assetItem(db, a, bySerial))) };
+      }
+      // admin: 기존 동작 그대로 enrolled devices 전체(최대 100).
       const rows = await db.select().from(devices).limit(100);
       const items = await Promise.all(rows.map((d) => enrolledDeviceItem(db, d)));
       return { items };
@@ -102,7 +134,7 @@ export function registerAdminDeviceRoutes(app: FastifyInstance) {
     const like = `%${q}%`;
 
     // assets(개인별 지급 대장)가 검색의 주 소스: 아직 enroll되지 않은 단말도 결과에 포함된다.
-    const assetRows = await matchedAssets(db, like);
+    const assetRows = (await matchedAssets(db, like)).filter((a) => !scope || scope.has(a.serial));
     const assetSerials = new Set(assetRows.map((a) => a.serial));
     const linkedDevices = assetSerials.size > 0
       ? await db.select().from(devices).where(inArray(devices.serial, [...assetSerials]))
@@ -111,15 +143,19 @@ export function registerAdminDeviceRoutes(app: FastifyInstance) {
     const assetResultItems = await Promise.all(assetRows.map((a) => assetItem(db, a, deviceBySerial)));
 
     // enrolled devices 중 assets에 매칭 행이 없는 것들(자산 대장 미등재)은 기존 checkout 기반 currentUser로 보강해 union한다.
-    const enrolledMatches = await matchedEnrolledDevices(db, like);
-    const fallbackDevices = enrolledMatches.filter((d) => !assetSerials.has(d.serial));
-    const fallbackItems = await Promise.all(fallbackDevices.map((d) => enrolledDeviceItem(db, d)));
+    // employee는 소유 자산에만 국한되므로 대장 미등재 fallback은 admin 전용이다.
+    const fallbackItems = scope ? [] : await (async () => {
+      const enrolledMatches = await matchedEnrolledDevices(db, like);
+      const fallbackDevices = enrolledMatches.filter((d) => !assetSerials.has(d.serial));
+      return Promise.all(fallbackDevices.map((d) => enrolledDeviceItem(db, d)));
+    })();
 
     return { items: [...assetResultItems, ...fallbackItems] };
   });
 
-  app.get('/api/admin/devices/:id', { preHandler: requireAdmin(app, ['admin']) }, async (req) => {
+  app.get('/api/admin/devices/:id', { preHandler: requireAdmin(app, ['admin', 'employee']) }, async (req) => {
     const id = Number((req.params as { id: string }).id);
+    await assertCanAccessDevice(db, req.admin!, id);
     const [device] = await db.select().from(devices).where(eq(devices.id, id)).limit(1);
     const recentReports = await db.select().from(reports).where(eq(reports.deviceId, id)).orderBy(desc(reports.reportedAt)).limit(20);
     const history = await db.select({
@@ -154,8 +190,16 @@ export function registerAdminDeviceRoutes(app: FastifyInstance) {
       return { queued: false, reason: 'send_failed' };
     }
   }
-  app.post('/api/admin/devices/:id/ring', { preHandler: requireAdmin(app, ['admin']) },
-    async (req) => sendCmd(Number((req.params as { id: string }).id), 'RING'));
-  app.post('/api/admin/devices/:id/locate', { preHandler: requireAdmin(app, ['admin']) },
-    async (req) => sendCmd(Number((req.params as { id: string }).id), 'LOCATE_NOW'));
+  app.post('/api/admin/devices/:id/ring', { preHandler: requireAdmin(app, ['admin', 'employee']) },
+    async (req) => {
+      const id = Number((req.params as { id: string }).id);
+      await assertCanAccessDevice(db, req.admin!, id);
+      return sendCmd(id, 'RING');
+    });
+  app.post('/api/admin/devices/:id/locate', { preHandler: requireAdmin(app, ['admin', 'employee']) },
+    async (req) => {
+      const id = Number((req.params as { id: string }).id);
+      await assertCanAccessDevice(db, req.admin!, id);
+      return sendCmd(id, 'LOCATE_NOW');
+    });
 }
