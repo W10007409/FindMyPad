@@ -16,6 +16,18 @@ export interface AppDeps { config: Config; db: DbClient; fcm: FcmSender; }
 
 export function buildApp(deps: AppDeps, opts: { logger?: boolean } = {}): FastifyInstance {
   const app = Fastify({ logger: opts.logger ?? false, trustProxy: deps.config.TRUST_PROXY });
+  // Tolerate an empty JSON body: bodyless POSTs (e.g. ring/locate commands) may still
+  // arrive with Content-Type: application/json. Fastify's default parser 400s on that;
+  // treat empty as no body so command endpoints don't reject valid requests.
+  app.addContentTypeParser('application/json', { parseAs: 'string' }, (_req, body, done) => {
+    if (body === '' || body == null) { done(null, undefined); return; }
+    try {
+      done(null, JSON.parse(body as string));
+    } catch (err) {
+      (err as Error & { statusCode?: number }).statusCode = 400;
+      done(err as Error, undefined);
+    }
+  });
   app.decorate('deps', deps);
   registerErrorHandler(app);
   registerAdminAuthRoutes(app);
