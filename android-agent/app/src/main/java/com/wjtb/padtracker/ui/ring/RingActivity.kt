@@ -43,6 +43,11 @@ class RingActivity : ComponentActivity() {
     setShowWhenLocked(true)
     setTurnScreenOn(true)
 
+    // The full-screen-intent notification that launched us has done its job; clear it so it
+    // doesn't linger after the ring screen is up (full-screen auto-launch skips autoCancel).
+    getSystemService(android.app.NotificationManager::class.java)
+      .cancel(com.wjtb.padtracker.push.PadMessagingService.RING_NOTIF_ID)
+
     audioManager = getSystemService(AudioManager::class.java)
 
     val department = intent.getStringExtra(EXTRA_DEPARTMENT).orEmpty()
