@@ -22,7 +22,7 @@ class PadMessagingService : FirebaseMessagingService() {
       // handler runs in the background), so we post a high-importance full-screen-intent
       // notification instead — the OS is allowed to launch RingActivity over the lock
       // screen from that, the same mechanism incoming-call screens use.
-      FcmCommand.Ring -> showRingFullScreen()
+      FcmCommand.Ring -> showRingFullScreen(message.data)
       FcmCommand.LocateNow ->
         // Fire an immediate one-off report (battery + Wi-Fi BSSID) instead of waiting for
         // the next periodic cycle. ReportWorker also flushes any queued reports.
@@ -41,7 +41,7 @@ class PadMessagingService : FirebaseMessagingService() {
     // (there is no standalone token-refresh endpoint yet).
   }
 
-  private fun showRingFullScreen() {
+  private fun showRingFullScreen(data: Map<String, String>) {
     val nm = getSystemService(NotificationManager::class.java)
     nm.createNotificationChannel(
       NotificationChannel(RING_CHANNEL_ID, "패드 찾기 벨", NotificationManager.IMPORTANCE_HIGH).apply {
@@ -49,11 +49,20 @@ class PadMessagingService : FirebaseMessagingService() {
         enableVibration(true)
       },
     )
+    // Carry the assigned renter (from the RING payload) into the ring screen so whoever
+    // finds the pad sees whose it is.
+    val ringIntent = Intent(this, RingActivity::class.java)
+      .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+      .putExtra(RingActivity.EXTRA_NAME, data["ownerName"].orEmpty())
+      .putExtra(RingActivity.EXTRA_DEPARTMENT, data["ownerDept"].orEmpty())
     val fullScreen = PendingIntent.getActivity(
       this,
       0,
-      Intent(this, RingActivity::class.java).addFlags(Intent.FLAG_ACTIVITY_NEW_TASK),
-      PendingIntent.FLAG_IMMUTABLE,
+      ringIntent,
+      // FLAG_UPDATE_CURRENT is required: PendingIntent equality ignores extras, so without it
+      // a cached PendingIntent from an earlier ring would keep its old (possibly empty) owner
+      // extras and this ring's owner name would never reach RingActivity.
+      PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT,
     )
     val notif = NotificationCompat.Builder(this, RING_CHANNEL_ID)
       .setSmallIcon(android.R.drawable.ic_lock_idle_alarm)
