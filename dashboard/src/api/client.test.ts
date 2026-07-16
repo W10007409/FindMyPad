@@ -14,6 +14,22 @@ describe('apiFetch', () => {
     expect(new Headers(init!.headers).get('Authorization')).toBe('Bearer TOK-1');
   });
 
+  test('bodyless POST does not send Content-Type (avoids Fastify empty-body 400)', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ queued: true }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    await apiFetch('/admin/devices/6/ring', { method: 'POST' });
+    const [, init] = fetchMock.mock.calls[0];
+    expect(new Headers(init!.headers).has('Content-Type')).toBe(false);
+  });
+
+  test('POST with a body still sends Content-Type: application/json', async () => {
+    const fetchMock = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
+      new Response(JSON.stringify({ token: 't' }), { status: 200, headers: { 'Content-Type': 'application/json' } }));
+    await apiFetch('/admin/login', { method: 'POST', body: JSON.stringify({ username: 'root', password: '1234' }) });
+    const [, init] = fetchMock.mock.calls[0];
+    expect(new Headers(init!.headers).get('Content-Type')).toBe('application/json');
+  });
+
   test('throws ApiError on non-ok', async () => {
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response('{"error":{"code":"X"}}', { status: 500 }));
     await expect(apiFetch('/admin/x')).rejects.toBeInstanceOf(ApiError);

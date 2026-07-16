@@ -13,7 +13,10 @@ async function safeJson(res: Response): Promise<unknown> { try { return await re
 
 export async function apiFetch<T>(path: string, opts: RequestInit = {}): Promise<T> {
   const headers = new Headers(opts.headers);
-  if (!headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
+  // Only declare a JSON body when there actually is one. Bodyless POSTs (ring/locate)
+  // must NOT send Content-Type: application/json, or Fastify rejects them with 400
+  // "Body cannot be empty when content-type is set to 'application/json'".
+  if (opts.body != null && !headers.has('Content-Type')) headers.set('Content-Type', 'application/json');
   const token = getToken();
   if (token) headers.set('Authorization', `Bearer ${token}`);
   const res = await fetch(`${BASE}${path}`, { ...opts, headers });
