@@ -6,6 +6,8 @@ const EnvSchema = z.object({
   RETENTION_DAYS: z.coerce.number().default(90),
   STALE_DAYS: z.coerce.number().default(7),
   CORP_SSIDS: z.string().default(''),
+  CORP_PUBLIC_IPS: z.string().default(''),
+  MAXMIND_MMDB_PATH: z.string().optional(),
   TRUST_PROXY: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
   FIREBASE_SERVICE_ACCOUNT: z.string().optional(),
 });
