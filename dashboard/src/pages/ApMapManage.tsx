@@ -2,6 +2,22 @@ import { useState } from 'react';
 import { useApMapUpload } from '../api/hooks';
 import { HelpPanel } from '../components/HelpPanel';
 
+const SAMPLE_CSV = `bssid,building,floor,zone,note
+AA:BB:CC:DD:EE:01,본관,3,동측,회의실 앞`;
+
+/** 샘플 CSV를 파일로 저장. 엑셀 한글 깨짐 방지를 위해 UTF-8 BOM을 앞에 붙인다. */
+function downloadSampleCsv() {
+  const blob = new Blob(['﻿' + SAMPLE_CSV], { type: 'text/csv;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'ap-map-sample.csv';
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export function ApMapManage() {
   const [csv, setCsv] = useState('');
   const upload = useApMapUpload();
@@ -13,9 +29,12 @@ export function ApMapManage() {
         <p>1. 아래 샘플처럼 CSV를 준비합니다. 2. 텍스트 영역에 붙여넣고 업로드합니다. 3. 업서트된 건수가 표시됩니다.</p>
         <p>BSSID는 패드 상세 화면의 &apos;주변 AP&apos; 목록에서 확인할 수 있습니다.</p>
         <pre className="overflow-x-auto rounded bg-surface-2 p-2 font-mono text-xs text-fg">
-{`bssid,building,floor,zone,note
-AA:BB:CC:DD:EE:01,본관,3,동측,회의실 앞`}
+{SAMPLE_CSV}
         </pre>
+        <button type="button" onClick={downloadSampleCsv}
+          className="mt-2 rounded border border-border bg-surface px-3 py-1 text-sm text-fg hover:bg-surface-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent motion-safe:transition-colors">
+          샘플 CSV 다운로드
+        </button>
       </HelpPanel>
       <label className="block text-sm text-fg">CSV
         <textarea value={csv} onChange={(e) => setCsv(e.target.value)} rows={10}
