@@ -12,6 +12,9 @@ import type { FcmCommand } from '../../services/fcm.js';
 type Device = typeof devices.$inferSelect;
 type Asset = typeof assets.$inferSelect;
 
+// admin은 전체 자산 대장을 조회할 수 있어야 한다. 목록/검색 상한(대장 규모를 덮는 넉넉한 값).
+const LIST_LIMIT = 5000;
+
 /** 사번(empNo)이 자산 대장에서 소유(owner)한 serial 집합. employee 스코핑의 기준. */
 async function ownedSerials(db: DbClient, empNo: string): Promise<Set<string>> {
   const rows = await db.select({ serial: assets.serial }).from(assets).where(eq(assets.ownerEmpNo, empNo));
@@ -81,14 +84,19 @@ async function assetItem(db: DbClient, a: Asset, deviceBySerial: Map<string, Dev
   };
 }
 
-/** q(serial/자산번호/소유자명/사번)에 매칭되는 assets 행 조회 */
+/** q에 매칭되는 assets 행 조회. admin이 다양한 축(소유자·조직·위치·모델·SAP)으로 조회할 수 있도록 넓게 매칭. */
 async function matchedAssets(db: DbClient, like: string) {
   return db.select().from(assets).where(or(
     ilike(assets.serial, like),
     ilike(assets.assetNo, like),
     ilike(assets.ownerName, like),
     ilike(assets.ownerEmpNo, like),
-  )).limit(100);
+    ilike(assets.org1, like),
+    ilike(assets.org2, like),
+    ilike(assets.location, like),
+    ilike(assets.model, like),
+    ilike(assets.sapNo, like),
+  )).limit(LIST_LIMIT);
 }
 
 /** q(serial/자산번호/현재 대여자 이름·사번)에 매칭되는 enrolled devices 조회 — 기존 검색 로직 */
@@ -103,7 +111,7 @@ async function matchedEnrolledDevices(db: DbClient, like: string) {
   const conditions = [ilike(devices.serial, like), ilike(devices.assetNo, like)];
   if (userMatchedDeviceIds.length > 0) conditions.push(inArray(devices.id, userMatchedDeviceIds));
 
-  return db.select().from(devices).where(or(...conditions)).limit(100);
+  return db.select().from(devices).where(or(...conditions)).limit(LIST_LIMIT);
 }
 
 type NearbyApEntry = { bssid: string; rssi: number; ssid?: string | null; frequency?: number | null };
@@ -147,17 +155,23 @@ export function registerAdminDeviceRoutes(app: FastifyInstance) {
     if (!q) {
       if (scope) {
         // 내 패드 목록: 본인 소유 자산 전체(enroll 여부 무관).
-        const mine = await db.select().from(assets).where(eq(assets.ownerEmpNo, admin.empNo)).limit(100);
+        const mine = await db.select().from(assets).where(eq(assets.ownerEmpNo, admin.empNo)).limit(LIST_LIMIT);
         const linked = mine.length
           ? await db.select().from(devices).where(inArray(devices.serial, mine.map((a) => a.serial)))
           : [];
         const bySerial = new Map(linked.map((d) => [d.serial, d]));
         return { items: await Promise.all(mine.map((a) => assetItem(db, a, bySerial))) };
       }
-      // admin: 기존 동작 그대로 enrolled devices 전체(최대 100).
-      const rows = await db.select().from(devices).limit(100);
-      const items = await Promise.all(rows.map((d) => enrolledDeviceItem(db, d)));
-      return { items };
+      // admin: 전체 자산 대장(enroll 여부 무관) + 대장에 없는 enrolled devices까지 모두 조회.
+      const allDevices = await db.select().from(devices).limit(LIST_LIMIT);
+      const bySerial = new Map(allDevices.map((d) => [d.serial, d]));
+      const allAssets = await db.select().from(assets).limit(LIST_LIMIT);
+      const assetSerials = new Set(allAssets.map((a) => a.serial));
+      const assetItems = await Promise.all(allAssets.map((a) => assetItem(db, a, bySerial)));
+      const extraItems = await Promise.all(
+        allDevices.filter((d) => !assetSerials.has(d.serial)).map((d) => enrolledDeviceItem(db, d)),
+      );
+      return { items: [...assetItems, ...extraItems] };
     }
 
     const like = `%${q}%`;

@@ -52,6 +52,38 @@ describe('admin devices', () => {
   });
 });
 
+describe('admin devices — admin 전체 조회', () => {
+  beforeEach(async () => {
+    // 대장에만 있고 아직 enroll 안 된 자산
+    await ctx.db.insert(assets).values({
+      serial: 'ASSET-ONLY', assetNo: 'A-ONLY', ownerName: '무등록', ownerEmpNo: 'E999',
+      org1: '연구소', org2: '특수팀', location: '별관2층', model: 'SM-X999',
+    });
+  });
+  it('빈 검색(홈) → 전체 대장(미등록 자산) + 대장 외 enrolled device를 모두 반환', async () => {
+    const res = await ctx.app.inject({ method: 'GET', url: '/api/admin/devices', headers: admin() });
+    expect(res.statusCode).toBe(200);
+    const items = res.json().items as Array<{ serial: string; enrolled: boolean }>;
+    const bySerial = new Map(items.map((i) => [i.serial, i]));
+    expect(bySerial.get('ASSET-ONLY')?.enrolled).toBe(false); // 미등록 자산도 보임
+    expect(bySerial.get('S1')?.enrolled).toBe(true);          // 대장에 없는 enrolled device도 보임
+  });
+  it('조직명으로 검색', async () => {
+    const res = await ctx.app.inject({ method: 'GET', url: `/api/admin/devices?q=${encodeURIComponent('특수팀')}`, headers: admin() });
+    const items = res.json().items;
+    expect(items).toHaveLength(1);
+    expect(items[0].serial).toBe('ASSET-ONLY');
+  });
+  it('위치로 검색', async () => {
+    const res = await ctx.app.inject({ method: 'GET', url: `/api/admin/devices?q=${encodeURIComponent('별관')}`, headers: admin() });
+    expect(res.json().items.map((i: { serial: string }) => i.serial)).toContain('ASSET-ONLY');
+  });
+  it('모델명으로 검색', async () => {
+    const res = await ctx.app.inject({ method: 'GET', url: '/api/admin/devices?q=SM-X999', headers: admin() });
+    expect(res.json().items.map((i: { serial: string }) => i.serial)).toContain('ASSET-ONLY');
+  });
+});
+
 describe('admin devices — assets 대장 검색', () => {
   const assetRow = {
     serial: 'R9TT306T78D', assetNo: '032022000216', model: 'SM-T500',
