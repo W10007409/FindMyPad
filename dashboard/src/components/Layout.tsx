@@ -1,5 +1,6 @@
 import { NavLink, Outlet } from 'react-router-dom';
 import { useAuth, isAdmin } from '../auth/AuthContext';
+import { ThemeToggle } from '../theme/ThemeToggle';
 
 export function Layout() {
   const { logout, session } = useAuth();
@@ -18,6 +19,7 @@ export function Layout() {
           {session && <span>{session.name}{admin ? ' (관리자)' : ''}</span>}
           <NavLink to="/change-password" className="hover:underline">비밀번호</NavLink>
           <button onClick={logout} className="hover:underline">로그아웃</button>
+          <ThemeToggle />
         </div>
       </header>
       <main><Outlet /></main>
