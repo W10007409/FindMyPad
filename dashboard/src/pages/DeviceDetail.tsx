@@ -8,6 +8,7 @@ import { LastSeen } from '../components/LastSeen';
 import { Toast } from '../components/Toast';
 import { TelemetryTable } from '../components/TelemetryTable';
 import { NearbyAps } from '../components/NearbyAps';
+import { LocationSection } from '../components/LocationSection';
 
 export function ringMessage(action: 'ring' | 'locate', r: RingResult): string {
   if (r.queued) return action === 'ring' ? '벨울리기 전송됨' : '위치 요청 전송됨';
@@ -44,6 +45,7 @@ export function DeviceDetail() {
           <button onClick={() => locate.mutate(deviceId, { onSuccess: (data) => notify(ringMessage('locate', data)) })} className="rounded border px-3 py-2">지금 위치 요청</button>
         </div>
       </div>
+      <LocationSection indoor={data.indoor} network={data.network ?? null} />
       <DeviceMap lat={latest?.lat ?? null} lng={latest?.lng ?? null} indoor={data.indoor} />
       <section>
         <h2 className="mb-2 font-semibold">최근 보고</h2>

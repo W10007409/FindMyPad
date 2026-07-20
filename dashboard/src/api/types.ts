@@ -19,8 +19,9 @@ export interface Report { id: number; reportedAt: string | null; lat: number | n
   nearbyAps: NearbyAp[] | null }
 export interface HistoryItem { id: number; empNo: string; name: string;
   checkedOut: string | null; returnedAt: string | null; consentAt: string | null }
+export interface NetworkLoc { publicIp: string | null; onCorpNetwork: boolean; city?: string | null; region?: string | null }
 export interface DeviceDetail { device: DeviceRow; currentUser: CurrentUser | null; indoor: Indoor | null;
-  recentReports: Report[]; history: HistoryItem[] }
+  network: NetworkLoc | null; recentReports: Report[]; history: HistoryItem[] }
 export interface StaleItem { id: number; serial: string; assetNo: string | null; lastSeenAt: string | null }
 export interface RingResult { queued: boolean; reason?: 'no_token' | 'send_failed'; }
 export interface LoginResponse { token: string; role: 'admin' | 'employee'; name: string; empNo: string; mustChangePassword: boolean }

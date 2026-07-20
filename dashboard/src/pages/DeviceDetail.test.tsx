@@ -14,7 +14,7 @@ function setup(path = '/devices/1') { return renderWithProviders(<Routes><Route 
 test('renders detail with user, indoor, history', async () => {
   setup();
   await waitFor(() => expect(screen.getByText('홍길동')).toBeInTheDocument());
-  expect(screen.getByText(/본관/)).toBeInTheDocument();
+  expect(screen.getAllByText(/본관/).length).toBeGreaterThan(0);
   expect(screen.getByText(/S1/)).toBeInTheDocument();
 });
 test('ring button triggers request and shows sent notice', async () => {
@@ -79,9 +79,55 @@ test('renders extended telemetry table and nearby AP list', async () => {
 test('shows not-found instead of crashing when server returns 200 with no device', async () => {
   server.use(
     http.get('*/api/admin/devices/:id', () =>
-      HttpResponse.json({ device: null, currentUser: null, indoor: null, recentReports: [], history: [] })
+      HttpResponse.json({ device: null, currentUser: null, indoor: null, network: null, recentReports: [], history: [] })
     )
   );
   setup('/devices/999');
   await waitFor(() => expect(screen.getByText('기기를 찾을 수 없습니다')).toBeInTheDocument());
+});
+test('shows corp network badge when device is on corp network', async () => {
+  server.use(
+    http.get('*/api/admin/devices/:id', ({ params }) => HttpResponse.json({
+      device: { id: Number(params.id), serial: 'S1', assetNo: 'A-1', model: 'SM-X200', wifiMac: null, knoxLicensed: false, enrolledAt: '2026-07-01T00:00:00Z', lastSeenAt: '2026-07-13T00:00:00Z' },
+      currentUser: { empNo: 'E100', name: '홍길동', dept: '개발' },
+      indoor: { building: '본관', floor: '3', zone: '동측' },
+      network: { publicIp: '10.0.1.23', onCorpNetwork: true, city: null, region: null },
+      recentReports: [{ id: 9, reportedAt: '2026-07-13T00:00:00Z', lat: null, lng: null, bssid: 'AP:1', ssid: 'CORP', batteryPct: 55 }],
+      history: [],
+    }))
+  );
+  setup();
+  await waitFor(() => screen.getByText('홍길동'));
+  expect(screen.getByText('사내망')).toBeInTheDocument();
+});
+test('shows external network badge and public IP when device is off corp network', async () => {
+  server.use(
+    http.get('*/api/admin/devices/:id', ({ params }) => HttpResponse.json({
+      device: { id: Number(params.id), serial: 'S1', assetNo: 'A-1', model: 'SM-X200', wifiMac: null, knoxLicensed: false, enrolledAt: '2026-07-01T00:00:00Z', lastSeenAt: '2026-07-13T00:00:00Z' },
+      currentUser: { empNo: 'E100', name: '홍길동', dept: '개발' },
+      indoor: { building: '본관', floor: '3', zone: '동측' },
+      network: { publicIp: '203.0.113.42', onCorpNetwork: false, city: '서울', region: null },
+      recentReports: [{ id: 9, reportedAt: '2026-07-13T00:00:00Z', lat: null, lng: null, bssid: 'AP:1', ssid: 'CORP', batteryPct: 55 }],
+      history: [],
+    }))
+  );
+  setup();
+  await waitFor(() => screen.getByText('홍길동'));
+  expect(screen.getByText('외부망')).toBeInTheDocument();
+  expect(screen.getByText(/203\.0\.113\.42/)).toBeInTheDocument();
+});
+test('shows AP-mapping guidance when indoor location is unknown', async () => {
+  server.use(
+    http.get('*/api/admin/devices/:id', ({ params }) => HttpResponse.json({
+      device: { id: Number(params.id), serial: 'S1', assetNo: 'A-1', model: 'SM-X200', wifiMac: null, knoxLicensed: false, enrolledAt: '2026-07-01T00:00:00Z', lastSeenAt: '2026-07-13T00:00:00Z' },
+      currentUser: { empNo: 'E100', name: '홍길동', dept: '개발' },
+      indoor: null,
+      network: { publicIp: '10.0.1.23', onCorpNetwork: true, city: null, region: null },
+      recentReports: [{ id: 9, reportedAt: '2026-07-13T00:00:00Z', lat: null, lng: null, bssid: 'AP:1', ssid: 'CORP', batteryPct: 55 }],
+      history: [],
+    }))
+  );
+  setup();
+  await waitFor(() => screen.getByText('홍길동'));
+  expect(screen.getByText('실내 위치 미확인 — AP매핑 필요')).toBeInTheDocument();
 });

@@ -19,6 +19,7 @@ export const handlers = [
     device: { id: Number(params.id), serial: 'S1', assetNo: 'A-1', model: 'SM-X200', wifiMac: null, knoxLicensed: false, enrolledAt: '2026-07-01T00:00:00Z', lastSeenAt: '2026-07-13T00:00:00Z' },
     currentUser: { empNo: 'E100', name: '홍길동', dept: '개발' },
     indoor: { building: '본관', floor: '3', zone: '동측' },
+    network: { publicIp: '10.0.1.23', onCorpNetwork: true, city: null, region: null },
     recentReports: [{ id: 9, reportedAt: '2026-07-13T00:00:00Z', lat: null, lng: null, bssid: 'AP:1', ssid: 'CORP', batteryPct: 55 }],
     history: [{ id: 3, empNo: 'E100', name: '홍길동', checkedOut: '2026-07-10T00:00:00Z', returnedAt: null, consentAt: '2026-07-10T00:00:00Z' }] })),
   http.post('*/api/admin/devices/:id/ring', () => HttpResponse.json({ queued: true })),
