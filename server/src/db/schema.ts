@@ -20,6 +20,11 @@ export const users = pgTable('users', {
   name: text('name').notNull(),
   dept: text('dept'),
   email: text('email'),
+  // 사번 로그인 인증 컬럼. 임포트된 직원은 초기 비밀번호 1234 + 강제 변경으로 시드된다.
+  passwordHash: text('password_hash'),
+  mustChangePassword: boolean('must_change_password').notNull().default(true),
+  role: text('role', { enum: ['admin', 'employee'] }).notNull().default('employee'),
+  isActive: boolean('is_active').notNull().default(true),
 });
 
 export const adminUsers = pgTable('admin_users', {
@@ -55,6 +60,21 @@ export const reports = pgTable('reports', {
 }, (t) => ({
   byDeviceTime: index('reports_device_time').on(t.deviceId, t.reportedAt.desc()),
 }));
+
+export const assets = pgTable('assets', {
+  serial: text('serial').primaryKey(),
+  assetNo: text('asset_no').unique(),
+  sapNo: text('sap_no'),
+  model: text('model'),
+  ownerName: text('owner_name'),
+  ownerEmpNo: text('owner_emp_no'),
+  org1: text('org1'),
+  org2: text('org2'),
+  location: text('location'),
+  status: text('status'),
+  issuedAt: text('issued_at'),
+  note: text('note'),
+});
 
 export const apMap = pgTable('ap_map', {
   bssid: text('bssid').primaryKey(),

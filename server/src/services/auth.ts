@@ -8,7 +8,7 @@ export function generateDeviceToken(): { token: string; hash: string } {
   const token = randomBytes(32).toString('hex');
   return { token, hash: hashToken(token) };
 }
-export type AdminJwtPayload = { sub: number; role: 'admin' | 'employee'; username: string };
+export type AdminJwtPayload = { sub: number; role: 'admin' | 'employee'; empNo: string };
 export function signAdminJwt(p: AdminJwtPayload, secret: string): string {
   return jwt.sign(p, secret, { expiresIn: '12h' });
 }
