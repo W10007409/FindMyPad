@@ -46,3 +46,13 @@ android-agent/scratch_*.png
 keyStore/
 apk-dist/
 /dist/
+
+# deploy secrets & IaC state
+deploy/compose/.env
+deploy/secrets/
+deploy/terraform/*.tfvars
+deploy/terraform/.terraform/
+deploy/terraform/*.tfstate
+deploy/terraform/*.tfstate.*
+deploy/terraform/crash.log
+!deploy/compose/.env.prod.example

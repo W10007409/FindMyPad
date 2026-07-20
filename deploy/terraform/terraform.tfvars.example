@@ -1,0 +1,36 @@
+# FindMyPad — example tfvars. Copy to terraform.tfvars and fill in real
+# values before `terraform apply`. Do NOT commit terraform.tfvars (it may
+# accumulate real domain/org info) — this .example file is the template.
+
+project = "findmypad"
+region  = "ap-northeast-2"
+
+# REQUIRED — replace with your real domain and existing Route53 hosted zone.
+domain           = "example.com"
+hosted_zone_name = "example.com" # must already exist in Route53 as a public hosted zone
+api_subdomain    = "api"
+app_subdomain    = "app"
+
+# Networking
+vpc_cidr           = "10.42.0.0/16"
+azs                = ["ap-northeast-2a", "ap-northeast-2c"]
+enable_nat_gateway = true
+
+# RDS
+db_instance_class      = "db.t4g.small"
+db_allocated_storage   = 20
+db_multi_az            = false # TODO(prod): true
+db_backup_retention    = 7
+db_deletion_protection = false # TODO(prod): true
+
+# ECS / Fargate
+ecs_cpu       = 512
+ecs_memory    = 1024
+desired_count = 2
+image_tag     = "latest" # TODO: pin to a git SHA per deploy, not a moving tag
+
+# Application behavior (server/src/config.ts)
+corp_public_ips = "" # e.g. "203.0.113.10,203.0.113.11/32" — comma-separated corp egress IPs/CIDRs
+corp_ssids      = "" # e.g. "CorpWifi-5G,CorpWifi-2G" — comma-separated corp SSIDs
+retention_days  = 90
+stale_days      = 7

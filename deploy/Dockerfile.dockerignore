@@ -1,0 +1,22 @@
+# 서버 이미지 빌드에 불필요한 것 전부 제외 (컨텍스트=레포 루트)
+.git
+node_modules
+dist
+coverage
+.superpowers
+dashboard
+android-agent
+addon_knox_api_level_28_samsung_electronics
+deploy
+!deploy/docker-entrypoint.sh
+docs
+apk-dist
+keyStore
+**/*.xlsx
+**/.env
+**/.env.*
+!**/.env.example
+**/local.properties
+**/google-services.json
+*.mmdb
+**/*.log

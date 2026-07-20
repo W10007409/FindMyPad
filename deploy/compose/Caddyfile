@@ -1,0 +1,29 @@
+# 단일 도메인: /api/* → API 서버, /health → API, 그 외 → 대시보드 SPA.
+# Caddy가 Let's Encrypt로 TLS 자동 발급/갱신 (80/443 공개 + 공인 DNS 필요).
+# 앱/대시보드는 같은 도메인을 바라본다:
+#   - Android 앱 defaultBaseUrl = https://{$DOMAIN}/
+#   - 대시보드 VITE_API_BASE_URL = /api  (기본값)
+
+{$DOMAIN} {
+	encode gzip
+
+	# 관리자/직원/패드 API (server 라우트가 /api/... 이므로 경로 유지)
+	handle /api/* {
+		reverse_proxy api:3000
+	}
+
+	# 헬스체크
+	handle /health {
+		reverse_proxy api:3000
+	}
+
+	# 대시보드 정적 SPA (클라이언트 라우팅 → index.html 폴백)
+	handle {
+		root * /srv/dashboard
+		try_files {path} /index.html
+		file_server
+	}
+
+	# Fastify가 X-Forwarded-For를 읽어 사내/외부망을 판정하므로 Caddy 기본 XFF로 충분.
+	# (TRUST_PROXY=true 필요)
+}
