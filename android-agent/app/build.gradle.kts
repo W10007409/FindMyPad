@@ -12,12 +12,15 @@ if (file("google-services.json").exists()) {
   apply(plugin = "com.google.gms.google-services")
 }
 
-// Knox Premium Emulation (KPE) license key — read from local.properties, defaults to "" so the
-// build still succeeds without it (only required at runtime for KPE activation).
-val kpeLicenseKey: String = Properties().apply {
+// local.properties(커밋 금지)에서 시크릿을 읽는다.
+val localProps = Properties().apply {
   val f = rootProject.file("local.properties")
   if (f.exists()) f.inputStream().use { load(it) }
-}.getProperty("KPE_LICENSE_KEY", "")
+}
+// Knox Premium Emulation (KPE) license key — 없으면 "" (런타임 KPE 활성화에만 필요).
+val kpeLicenseKey: String = localProps.getProperty("KPE_LICENSE_KEY", "")
+// 릴리스 서명 keystore — local.properties에 KEYSTORE_FILE 이 있으면 release 서명, 없으면 unsigned(빌드는 성공).
+val releaseKeystoreFile: String? = localProps.getProperty("KEYSTORE_FILE")
 android {
   namespace = "com.wjtb.padtracker"
   compileSdk = 34
@@ -35,6 +38,23 @@ android {
     create("knox") {
       dimension = "target"
       buildConfigField("String", "KPE_LICENSE_KEY", "\"$kpeLicenseKey\"")
+    }
+  }
+  signingConfigs {
+    create("release") {
+      if (releaseKeystoreFile != null) {
+        storeFile = file(releaseKeystoreFile)
+        storePassword = localProps.getProperty("KEYSTORE_PASSWORD")
+        keyAlias = localProps.getProperty("KEY_ALIAS")
+        keyPassword = localProps.getProperty("KEY_PASSWORD")
+      }
+    }
+  }
+  buildTypes {
+    getByName("release") {
+      isMinifyEnabled = false
+      // keystore 정보가 있을 때만 서명(없으면 unsigned release).
+      if (releaseKeystoreFile != null) signingConfig = signingConfigs.getByName("release")
     }
   }
   buildFeatures { compose = true; buildConfig = true }

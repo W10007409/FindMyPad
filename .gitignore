@@ -12,7 +12,6 @@ local.properties
 
 # === Node / 서버·대시보드 ===
 node_modules/
-dist/
 build/
 coverage/
 *.log
@@ -44,3 +43,6 @@ addon_knox_api_level_28_samsung_electronics/
 
 # throwaway dev screenshots
 android-agent/scratch_*.png
+keyStore/
+apk-dist/
+/dist/
