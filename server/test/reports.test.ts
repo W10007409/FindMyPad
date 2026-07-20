@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterAll } from 'vitest';
 import { makeTestApp } from './helpers/app.js';
 import { devices, reports, apMap } from '../src/db/schema.js';
-import { eq } from 'drizzle-orm';
+import { eq, desc } from 'drizzle-orm';
 
 const ctx = makeTestApp();
 let token: string;
@@ -31,5 +31,23 @@ describe('POST /api/reports', () => {
     expect(rep.publicIp).toBe('203.0.113.9');
     const [dev] = await ctx.db.select().from(devices).where(eq(devices.serial, 'S1'));
     expect(dev.lastSeenAt).not.toBeNull();
+  });
+  it('persists extended telemetry fields', async () => {
+    const res = await ctx.app.inject({
+      method: 'POST', url: '/api/reports',
+      headers: { authorization: `Bearer ${token}` },
+      payload: {
+        batteryPct: 55, batteryStatus: 'charging', batteryPlug: 'ac', batteryTempC: 31.5,
+        batteryHealth: 'good', batteryVoltageMv: 4123, wifiRssi: -47, wifiLinkMbps: 433,
+        wifiFreqMhz: 5180, localIp: '10.0.0.12', storageFreeMb: 20480, storageTotalMb: 65536,
+        osVersion: 'Android 13 (SDK 33)', uptimeSec: 86400,
+        nearbyAps: [{ bssid: 'aa:bb:cc:dd:ee:01', rssi: -50, ssid: 'CORP', frequency: 5180 }],
+      },
+    });
+    expect(res.statusCode).toBe(200);
+    const [row] = await ctx.db.select().from(reports).orderBy(desc(reports.id)).limit(1);
+    expect(row.batteryStatus).toBe('charging');
+    expect(row.storageFreeMb).toBe(20480);
+    expect((row.nearbyAps as any[])[0].bssid).toBe('aa:bb:cc:dd:ee:01');
   });
 });

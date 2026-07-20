@@ -1,4 +1,4 @@
-import { pgTable, bigserial, text, timestamp, boolean, doublePrecision, real, smallint, bigint, inet, uniqueIndex, index } from 'drizzle-orm/pg-core';
+import { pgTable, bigserial, text, timestamp, boolean, doublePrecision, real, smallint, bigint, inet, integer, jsonb, uniqueIndex, index } from 'drizzle-orm/pg-core';
 import { sql } from 'drizzle-orm';
 
 export const devices = pgTable('devices', {
@@ -57,6 +57,20 @@ export const reports = pgTable('reports', {
   ssid: text('ssid'),
   publicIp: inet('public_ip'),
   batteryPct: smallint('battery_pct'),
+  batteryStatus: text('battery_status'),
+  batteryPlug: text('battery_plug'),
+  batteryTempC: real('battery_temp_c'),
+  batteryHealth: text('battery_health'),
+  batteryVoltageMv: integer('battery_voltage_mv'),
+  wifiRssi: smallint('wifi_rssi'),
+  wifiLinkMbps: smallint('wifi_link_mbps'),
+  wifiFreqMhz: integer('wifi_freq_mhz'),
+  localIp: text('local_ip'),
+  storageFreeMb: integer('storage_free_mb'),
+  storageTotalMb: integer('storage_total_mb'),
+  osVersion: text('os_version'),
+  uptimeSec: bigint('uptime_sec', { mode: 'number' }),
+  nearbyAps: jsonb('nearby_aps'),
 }, (t) => ({
   byDeviceTime: index('reports_device_time').on(t.deviceId, t.reportedAt.desc()),
 }));
