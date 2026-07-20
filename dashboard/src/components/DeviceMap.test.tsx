@@ -13,8 +13,8 @@ test('renders map when coords present', () => {
   render(<DeviceMap lat={37.5} lng={127} indoor={null} />);
   expect(screen.getByTestId('map')).toBeInTheDocument();
 });
-test('renders indoor fallback when no coords', () => {
+test('renders no-coords fallback without duplicating indoor label (LocationSection owns indoor display)', () => {
   render(<DeviceMap lat={null} lng={null} indoor={{ building: '본관', floor: '3', zone: '동측' }} />);
   expect(screen.getByText(/네트워크 좌표 없음/)).toBeInTheDocument();
-  expect(screen.getByText(/본관/)).toBeInTheDocument();
+  expect(screen.queryByText('본관')).not.toBeInTheDocument();
 });

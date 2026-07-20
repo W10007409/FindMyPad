@@ -8,9 +8,8 @@ export function hasCoords(lat: number | null, lng: number | null): boolean { ret
 export function DeviceMap({ lat, lng, indoor }: { lat: number | null; lng: number | null; indoor: Indoor | null }) {
   if (!hasCoords(lat, lng)) {
     return (
-      <div className="flex h-64 flex-col items-center justify-center rounded-lg border bg-gray-50 text-center dark:border-gray-700 dark:bg-gray-800">
-        <p className="text-sm text-gray-500">네트워크 좌표 없음 — 실내위치 기준</p>
-        <p className="mt-2 text-lg"><IndoorLabel indoor={indoor} /></p>
+      <div className="flex h-64 flex-col items-center justify-center rounded-lg border border-border bg-surface-2 text-center">
+        <p className="text-sm text-fg-muted">네트워크 좌표 없음 — 실내위치 기준</p>
       </div>
     );
   }
