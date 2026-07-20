@@ -7,6 +7,8 @@ local.properties
 .env.*
 !.env.example
 *.xlsx
+# MaxMind geo DB (운영자가 로컬에 배치, 커밋 금지)
+*.mmdb
 
 # === Node / 서버·대시보드 ===
 node_modules/

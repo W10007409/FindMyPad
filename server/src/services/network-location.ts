@@ -1,5 +1,3 @@
-import { existsSync } from 'node:fs';
-
 export type NetworkLocation = {
   publicIp: string | null;
   onCorpNetwork: boolean;
@@ -52,37 +50,15 @@ function matchesCidr(ipInt: number, entry: string): boolean {
 }
 
 /**
- * Best-effort offline geo lookup via an optional MaxMind mmdb file. `maxmind` is intentionally
- * NOT a project dependency — this lazily imports it only when a usable mmdbPath is configured,
- * and swallows any failure (module absent, file unreadable, no match). Because
- * resolveNetworkLocation() must stay synchronous (later tasks depend on that signature), this
- * lookup cannot populate the result it's attached to; it's a defensive no-op placeholder until a
- * proper async geo path is introduced.
- */
-function tryGeoLookup(mmdbPath: string): void {
-  try {
-    if (!existsSync(mmdbPath)) return;
-    const moduleName = 'maxmind';
-    void import(moduleName).catch(() => {
-      // maxmind not installed, or failed to load — no-op by design.
-    });
-  } catch {
-    // defensive: never let geo lookup affect corp/external classification.
-  }
-}
-
-/**
  * Classifies a report's public IP as on-corp-network vs external using a configurable list of
- * CIDR blocks / bare IPs (IPv4 only). Pure w.r.t. corp/external classification; geo enrichment
- * (city/region) is best-effort and optional, see tryGeoLookup().
+ * CIDR blocks / bare IPs (IPv4 only). Pure w.r.t. corp/external classification; city/region are
+ * never populated — no geo lookup is wired in (see comment inside the function body).
  */
 export function resolveNetworkLocation(
   ip: string | null,
   opts: { corpCidrs: string[]; mmdbPath?: string },
 ): NetworkLocation {
-  if (opts.mmdbPath) {
-    tryGeoLookup(opts.mmdbPath);
-  }
+  // Offline geo (MaxMind mmdb) intentionally not wired: sync interface + no dependency. city/region stay undefined.
 
   if (!ip) {
     return { publicIp: null, onCorpNetwork: false };

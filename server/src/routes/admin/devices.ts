@@ -1,7 +1,7 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import { and, desc, eq, ilike, inArray, isNull, or } from 'drizzle-orm';
-import { devices, users, checkouts, reports, assets } from '../../db/schema.js';
+import { devices, users, checkouts, reports, assets, apMap } from '../../db/schema.js';
 import type { DbClient } from '../../db/client.js';
 import { requireAdmin } from '../../plugins/auth-admin.js';
 import { resolveIndoorLocation, resolveIndoorLocationFromReport } from '../../services/location.js';
@@ -106,6 +106,34 @@ async function matchedEnrolledDevices(db: DbClient, like: string) {
   return db.select().from(devices).where(or(...conditions)).limit(100);
 }
 
+type NearbyApEntry = { bssid: string; rssi: number; ssid?: string | null; frequency?: number | null };
+type Report = typeof reports.$inferSelect;
+
+/**
+ * recentReports의 각 항목마다 nearbyAps[].indoor를 채워 반환한다(C.3/B.4).
+ * 모든 report에 걸친 bssid 합집합으로 ap_map을 한 번만 조회한다.
+ */
+async function withNearbyApIndoor(db: DbClient, recentReports: Report[]): Promise<Report[]> {
+  const bssids = new Set<string>();
+  for (const r of recentReports) {
+    const nearbyAps = r.nearbyAps as NearbyApEntry[] | null;
+    for (const ap of nearbyAps ?? []) bssids.add(ap.bssid);
+  }
+  if (bssids.size === 0) return recentReports;
+
+  const rows = await db.select().from(apMap).where(inArray(apMap.bssid, [...bssids]));
+  const indoorByBssid = new Map(rows.map((row) => [row.bssid, { building: row.building, floor: row.floor, zone: row.zone }]));
+
+  return recentReports.map((r) => {
+    const nearbyAps = r.nearbyAps as NearbyApEntry[] | null;
+    if (!nearbyAps) return r;
+    return {
+      ...r,
+      nearbyAps: nearbyAps.map((ap) => ({ ...ap, indoor: indoorByBssid.get(ap.bssid) ?? null })),
+    };
+  });
+}
+
 export function registerAdminDeviceRoutes(app: FastifyInstance) {
   const db = app.deps.db;
 
@@ -178,7 +206,9 @@ export function registerAdminDeviceRoutes(app: FastifyInstance) {
     const network = resolveNetworkLocation(ip, { corpCidrs, mmdbPath: app.deps.config.MAXMIND_MMDB_PATH });
     // serial이 일치하는 자산 대장 행이 있으면 배정된 소유자(asset) 정보도 함께 반환한다. (기존 필드는 그대로 유지)
     const asset = device ? (await db.select().from(assets).where(eq(assets.serial, device.serial)).limit(1))[0] ?? null : null;
-    return { device, currentUser, indoor, network, recentReports, history, asset };
+    // 각 recentReports 항목의 nearbyAps[]에 ap_map 매핑 위치(indoor)를 붙인다(C.3/B.4).
+    const enrichedRecentReports = await withNearbyApIndoor(db, recentReports);
+    return { device, currentUser, indoor, network, recentReports: enrichedRecentReports, history, asset };
   });
 
   async function sendCmd(id: number, type: 'RING' | 'LOCATE_NOW'): Promise<{ queued: boolean; reason?: 'no_token' | 'send_failed' }> {

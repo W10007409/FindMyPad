@@ -168,4 +168,27 @@ describe('admin devices — 상세: network(사내/외부망) + indoor(주변 �
     const detail = res.json();
     expect(detail.indoor).toEqual({ building: '신관', floor: '5', zone: '북측' });
   });
+
+  it('recentReports의 각 nearbyAps 항목에 ap_map 매핑 결과가 indoor로 붙는다(미매핑은 null)', async () => {
+    const list = await ctx.app.inject({ method: 'GET', url: '/api/admin/devices?q=S1', headers: admin() });
+    const id = list.json().items[0].id;
+    const [device] = await ctx.db.select().from(devices).where(eq(devices.id, id)).limit(1);
+    await ctx.db.insert(reports).values({
+      deviceId: device.id,
+      bssid: 'AP:1',
+      nearbyAps: [
+        { bssid: 'AP:1', rssi: -40 },
+        { bssid: 'AP:UNMAPPED', rssi: -80 },
+      ],
+      reportedAt: new Date('2030-01-01T00:00:00Z'),
+    });
+    const res = await ctx.app.inject({ method: 'GET', url: `/api/admin/devices/${id}`, headers: admin() });
+    const detail = res.json();
+    const top = detail.recentReports[0];
+    expect(top.nearbyAps).toHaveLength(2);
+    const mapped = top.nearbyAps.find((ap: { bssid: string }) => ap.bssid === 'AP:1');
+    const unmapped = top.nearbyAps.find((ap: { bssid: string }) => ap.bssid === 'AP:UNMAPPED');
+    expect(mapped.indoor).toEqual({ building: '본관', floor: '3', zone: '동측' });
+    expect(unmapped.indoor).toBeNull();
+  });
 });
