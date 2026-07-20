@@ -41,3 +41,6 @@ android-agent/local.properties
 
 # === Knox SDK 애드온 (Samsung restricted software — git 미포함, 로컬/아티팩트 보관) ===
 addon_knox_api_level_28_samsung_electronics/
+
+# throwaway dev screenshots
+android-agent/scratch_*.png
