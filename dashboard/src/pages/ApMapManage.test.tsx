@@ -10,3 +10,10 @@ test('uploads csv and shows upserted count', async () => {
   await userEvent.click(screen.getByRole('button', { name: /업로드/ }));
   await waitFor(() => expect(screen.getByText(/2건/)).toBeInTheDocument());
 });
+test('shows help panel with sample CSV and guidance', () => {
+  renderWithProviders(<ApMapManage />);
+  expect(screen.getByText('AP매핑이란?')).toBeInTheDocument();
+  expect(screen.getAllByText(/bssid,building,floor,zone,note/).length).toBeGreaterThan(0);
+  expect(screen.getByText(/AA:BB:CC:DD:EE:01/)).toBeInTheDocument();
+  expect(screen.getByText(/주변 AP/)).toBeInTheDocument();
+});
