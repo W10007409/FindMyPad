@@ -6,6 +6,8 @@ import { DeviceMap } from '../components/DeviceMap';
 import { Battery } from '../components/Battery';
 import { LastSeen } from '../components/LastSeen';
 import { Toast } from '../components/Toast';
+import { TelemetryTable } from '../components/TelemetryTable';
+import { NearbyAps } from '../components/NearbyAps';
 
 export function ringMessage(action: 'ring' | 'locate', r: RingResult): string {
   if (r.queued) return action === 'ring' ? '벨울리기 전송됨' : '위치 요청 전송됨';
@@ -52,6 +54,8 @@ export function DeviceDetail() {
             </li>))}
         </ul>
       </section>
+      <TelemetryTable report={data.recentReports[0]} />
+      <NearbyAps aps={data.recentReports[0]?.nearbyAps ?? []} />
       <section>
         <h2 className="mb-2 font-semibold">대여 이력</h2>
         <ul className="space-y-1 text-sm">

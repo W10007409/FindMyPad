@@ -8,8 +8,15 @@ export interface DeviceListItem {
 }
 export interface DeviceRow { id: number; serial: string; assetNo: string | null; model: string | null;
   wifiMac: string | null; knoxLicensed: boolean; enrolledAt: string | null; lastSeenAt: string | null }
+export interface NearbyAp { bssid: string; rssi: number; ssid?: string | null; frequency?: number | null;
+  indoor?: Indoor | null }
 export interface Report { id: number; reportedAt: string | null; lat: number | null; lng: number | null;
-  bssid: string | null; ssid: string | null; batteryPct: number | null }
+  bssid: string | null; ssid: string | null; batteryPct: number | null;
+  batteryStatus: string | null; batteryPlug: string | null; batteryTempC: number | null;
+  batteryHealth: string | null; batteryVoltageMv: number | null;
+  wifiRssi: number | null; wifiLinkMbps: number | null; wifiFreqMhz: number | null; localIp: string | null;
+  storageFreeMb: number | null; storageTotalMb: number | null; osVersion: string | null; uptimeSec: number | null;
+  nearbyAps: NearbyAp[] | null }
 export interface HistoryItem { id: number; empNo: string; name: string;
   checkedOut: string | null; returnedAt: string | null; consentAt: string | null }
 export interface DeviceDetail { device: DeviceRow; currentUser: CurrentUser | null; indoor: Indoor | null;
