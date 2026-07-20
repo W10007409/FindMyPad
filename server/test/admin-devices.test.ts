@@ -1,7 +1,8 @@
-import { describe, it, expect, beforeEach, afterAll } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, afterAll } from 'vitest';
+import { eq } from 'drizzle-orm';
 import { makeTestApp } from './helpers/app.js';
 import { seedAdmin } from '../src/db/seed.js';
-import { users, apMap, assets } from '../src/db/schema.js';
+import { users, apMap, assets, devices, reports } from '../src/db/schema.js';
 
 const ctx = makeTestApp();
 let dtoken: string, atoken: string;
@@ -103,5 +104,68 @@ describe('admin devices — assets 대장 검색', () => {
     expect(items[0].id).not.toBeNull();
     expect(items[0].batteryPct).toBe(77);
     expect(items[0].currentUser).toEqual({ empNo: '10015727', name: '이은영', dept: '서비스기획팀' });
+  });
+});
+
+describe('admin devices — 상세: network(사내/외부망) + indoor(주변 스캔 매핑)', () => {
+  afterEach(() => {
+    // 다른 테스트에 새어나가지 않도록 리셋
+    ctx.config.CORP_PUBLIC_IPS = '';
+  });
+
+  it('최신 보고의 publicIp가 CORP_PUBLIC_IPS 범위 안 → network.onCorpNetwork===true, publicIp 그대로 반영', async () => {
+    ctx.config.CORP_PUBLIC_IPS = '203.0.113.0/24';
+    const list = await ctx.app.inject({ method: 'GET', url: '/api/admin/devices?q=S1', headers: admin() });
+    const id = list.json().items[0].id;
+    const res = await ctx.app.inject({ method: 'GET', url: `/api/admin/devices/${id}`, headers: admin() });
+    const detail = res.json();
+    expect(detail.network.onCorpNetwork).toBe(true);
+    expect(detail.network.publicIp).toBe('203.0.113.9');
+  });
+
+  it('최신 보고의 publicIp가 CORP_PUBLIC_IPS 범위 밖 → network.onCorpNetwork===false', async () => {
+    ctx.config.CORP_PUBLIC_IPS = '10.0.0.0/8';
+    const list = await ctx.app.inject({ method: 'GET', url: '/api/admin/devices?q=S1', headers: admin() });
+    const id = list.json().items[0].id;
+    const res = await ctx.app.inject({ method: 'GET', url: `/api/admin/devices/${id}`, headers: admin() });
+    const detail = res.json();
+    expect(detail.network.onCorpNetwork).toBe(false);
+  });
+
+  it('publicIp가 ::ffff: 접두(IPv4-mapped IPv6)여도 벗겨내어 사내망으로 분류된다', async () => {
+    ctx.config.CORP_PUBLIC_IPS = '203.0.113.0/24';
+    const list = await ctx.app.inject({ method: 'GET', url: '/api/admin/devices?q=S1', headers: admin() });
+    const id = list.json().items[0].id;
+    const [device] = await ctx.db.select().from(devices).where(eq(devices.id, id)).limit(1);
+    await ctx.db.insert(reports).values({
+      deviceId: device.id, publicIp: '::ffff:203.0.113.9', bssid: 'AP:1',
+      reportedAt: new Date('2030-01-01T00:00:00Z'),
+    });
+    const res = await ctx.app.inject({ method: 'GET', url: `/api/admin/devices/${id}`, headers: admin() });
+    const detail = res.json();
+    expect(detail.network.onCorpNetwork).toBe(true);
+    expect(detail.network.publicIp).toBe('203.0.113.9');
+  });
+
+  it('연결 bssid가 미매핑이어도 주변 스캔 중 가장 강한 신호의 매핑된 AP로 indoor를 반환한다', async () => {
+    await ctx.db.insert(apMap).values([
+      { bssid: 'AP:2', building: '별관', floor: '1', zone: '서측' },
+      { bssid: 'AP:3', building: '신관', floor: '5', zone: '북측' },
+    ]);
+    const list = await ctx.app.inject({ method: 'GET', url: '/api/admin/devices?q=S1', headers: admin() });
+    const id = list.json().items[0].id;
+    const [device] = await ctx.db.select().from(devices).where(eq(devices.id, id)).limit(1);
+    await ctx.db.insert(reports).values({
+      deviceId: device.id,
+      bssid: 'AP:UNMAPPED',
+      nearbyAps: [
+        { bssid: 'AP:2', rssi: -80 },
+        { bssid: 'AP:3', rssi: -40 },
+      ],
+      reportedAt: new Date('2030-01-01T00:00:00Z'),
+    });
+    const res = await ctx.app.inject({ method: 'GET', url: `/api/admin/devices/${id}`, headers: admin() });
+    const detail = res.json();
+    expect(detail.indoor).toEqual({ building: '신관', floor: '5', zone: '북측' });
   });
 });

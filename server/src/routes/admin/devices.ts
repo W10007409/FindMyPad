@@ -4,7 +4,8 @@ import { and, desc, eq, ilike, inArray, isNull, or } from 'drizzle-orm';
 import { devices, users, checkouts, reports, assets } from '../../db/schema.js';
 import type { DbClient } from '../../db/client.js';
 import { requireAdmin } from '../../plugins/auth-admin.js';
-import { resolveIndoorLocation } from '../../services/location.js';
+import { resolveIndoorLocation, resolveIndoorLocationFromReport } from '../../services/location.js';
+import { resolveNetworkLocation } from '../../services/network-location.js';
 import { NotFoundError, ForbiddenError } from '../../errors.js';
 import type { FcmCommand } from '../../services/fcm.js';
 
@@ -164,10 +165,20 @@ export function registerAdminDeviceRoutes(app: FastifyInstance) {
     }).from(checkouts).innerJoin(users, eq(checkouts.userId, users.id))
       .where(eq(checkouts.deviceId, id)).orderBy(desc(checkouts.checkedOut)).limit(50);
     const currentUser = await activeUser(db, id);
-    const indoor = await resolveIndoorLocation(db, recentReports[0]?.bssid ?? null);
+    const top = recentReports[0] ?? null;
+    const indoor = await resolveIndoorLocationFromReport(db, {
+      bssid: top?.bssid ?? null,
+      nearbyAps: (top?.nearbyAps as { bssid: string; rssi: number }[] | null) ?? null,
+    });
+    // 사내망(corp) 여부 분류: publicIp가 IPv4-mapped IPv6(`::ffff:a.b.c.d`, 듀얼스택 프록시 경유 시)이면
+    // 벗겨내지 않으면 IPv4로 인식되지 않아 항상 external로 분류되므로 접두를 제거한다.
+    const corpCidrs = app.deps.config.CORP_PUBLIC_IPS.split(',').map((s) => s.trim()).filter(Boolean);
+    const rawIp = top?.publicIp ?? null;
+    const ip = rawIp && rawIp.startsWith('::ffff:') ? rawIp.slice('::ffff:'.length) : rawIp;
+    const network = resolveNetworkLocation(ip, { corpCidrs, mmdbPath: app.deps.config.MAXMIND_MMDB_PATH });
     // serial이 일치하는 자산 대장 행이 있으면 배정된 소유자(asset) 정보도 함께 반환한다. (기존 필드는 그대로 유지)
     const asset = device ? (await db.select().from(assets).where(eq(assets.serial, device.serial)).limit(1))[0] ?? null : null;
-    return { device, currentUser, indoor, recentReports, history, asset };
+    return { device, currentUser, indoor, network, recentReports, history, asset };
   });
 
   async function sendCmd(id: number, type: 'RING' | 'LOCATE_NOW'): Promise<{ queued: boolean; reason?: 'no_token' | 'send_failed' }> {
