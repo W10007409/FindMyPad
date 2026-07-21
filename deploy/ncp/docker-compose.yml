@@ -1,11 +1,12 @@
-# NCP 구성: 로컬 박스(공인 IP)에서 API + PostgreSQL + Caddy(TLS)를 돌리는 "원본(origin)".
-# 대시보드는 NCP Object Storage + CDN+ 에 별도 호스팅(다른 오리진) → API는 CORS 허용 필요.
+# NCP 구성(경로별 원본): wjtools 하나만 사용 + 프록시/서브도메인 불가.
+# NCP CDN+ 가 /FindMyPad/api/* 를 "이 로컬 박스 공인 IP"에서 당기도록(경로별 원본) 설정한다.
+# → 로컬은 API를 공인 IP:포트로 노출하기만 하면 된다(도메인/TLS 불필요; CDN이 클라이언트 TLS 종단).
 #
 # 사용:
-#   cp .env.example .env      # 값 채우기 (특히 API_DOMAIN, CORS_ORIGINS, DB비번, JWT)
+#   cp .env.example .env      # BASE_PATH=/FindMyPad, ORIGIN_PORT, DB비번, JWT
 #   mkdir -p ../secrets && cp <firebase 서비스계정>.json ../secrets/firebase-service-account.json
 #   docker compose up -d --build
-# 사전: api.<도메인> A레코드 → 이 박스 공인 IP, 방화벽 80/443 인바운드 개방(Let's Encrypt).
+# ⚠️ ORIGIN_PORT 를 공인에 여는 만큼, 방화벽에서 source 를 'NCP CDN egress IP 대역'으로 제한 권장.
 name: findmypad-ncp
 
 services:
@@ -26,7 +27,7 @@ services:
 
   api:
     build:
-      context: ../..            # 레포 루트
+      context: ../..
       dockerfile: deploy/Dockerfile
     restart: unless-stopped
     depends_on:
@@ -35,9 +36,9 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
-      TRUST_PROXY: "true"                    # Caddy/프록시 뒤 → X-Forwarded-For로 실 IP(사내/외부망 판정)
-      BASE_PATH: ${BASE_PATH:-}              # 하위경로 배포 시 예: /FindMyPad (API가 /FindMyPad/api 로 서빙)
-      CORS_ORIGINS: ${CORS_ORIGINS:-}        # 대시보드가 '다른 오리진'일 때만. 같은 호스트(/FindMyPad)면 비움
+      TRUST_PROXY: "true"                    # CDN 뒤 → X-Forwarded-For로 실 IP(사내/외부망 판정)
+      BASE_PATH: ${BASE_PATH:-/FindMyPad}    # CDN이 경로 그대로 전달 → API는 /FindMyPad/api 로 수신
+      CORS_ORIGINS: ${CORS_ORIGINS:-}        # 같은 호스트(wjtools) → 비움
       CORP_PUBLIC_IPS: ${CORP_PUBLIC_IPS:-}
       CORP_SSIDS: ${CORP_SSIDS:-}
       RETENTION_DAYS: ${RETENTION_DAYS:-90}
@@ -48,24 +49,9 @@ services:
       MAXMIND_MMDB_PATH: ${MAXMIND_MMDB_PATH:-}
     volumes:
       - ../secrets:/run/secrets:ro
-    expose:
-      - "3000"
-
-  caddy:
-    image: caddy:2-alpine
-    restart: unless-stopped
-    depends_on: [api]
+    # CDN이 당길 공인 원본 포트. (예: 8080 → CDN origin = http://<공인IP>:8080)
     ports:
-      - "80:80"
-      - "443:443"
-    environment:
-      API_DOMAIN: ${API_DOMAIN}
-    volumes:
-      - ./Caddyfile:/etc/caddy/Caddyfile:ro
-      - caddy_data:/data
-      - caddy_config:/config
+      - "${ORIGIN_PORT:-8080}:3000"
 
 volumes:
   pgdata:
-  caddy_data:
-  caddy_config:
