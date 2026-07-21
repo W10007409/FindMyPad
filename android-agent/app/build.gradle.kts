@@ -21,6 +21,8 @@ val localProps = Properties().apply {
 val kpeLicenseKey: String = localProps.getProperty("KPE_LICENSE_KEY", "")
 // 릴리스 서명 keystore — local.properties에 KEYSTORE_FILE 이 있으면 release 서명, 없으면 unsigned(빌드는 성공).
 val releaseKeystoreFile: String? = localProps.getProperty("KEYSTORE_FILE")
+// knox(프로덕션) 기본 서버 URL. local.properties의 PROD_BASE_URL로 오버라이드 가능. 끝에 '/' 포함.
+val prodBaseUrl: String = localProps.getProperty("PROD_BASE_URL", "https://wjtools.wjthinkbig.com/FindMyPad/")
 android {
   namespace = "com.wjtb.padtracker"
   compileSdk = 34
@@ -34,10 +36,16 @@ android {
   }
   flavorDimensions += "target"
   productFlavors {
-    create("dev") { dimension = "target" }
+    create("dev") {
+      dimension = "target"
+      // 로컬 개발: adb reverse 127.0.0.1:3000
+      buildConfigField("String", "DEFAULT_BASE_URL", "\"http://127.0.0.1:3000/\"")
+    }
     create("knox") {
       dimension = "target"
       buildConfigField("String", "KPE_LICENSE_KEY", "\"$kpeLicenseKey\"")
+      // 프로덕션 서버 URL (구성 B: 단일 호스트 하위경로)
+      buildConfigField("String", "DEFAULT_BASE_URL", "\"$prodBaseUrl\"")
     }
   }
   signingConfigs {

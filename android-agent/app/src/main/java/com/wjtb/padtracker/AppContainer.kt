@@ -8,9 +8,9 @@ import com.wjtb.padtracker.data.*
 import com.wjtb.padtracker.data.api.ApiFactory
 import com.wjtb.padtracker.data.queue.*
 class AppContainer(context: Context) {
-  // adb reverse tcp:3000 tcp:3000 로 기기의 127.0.0.1:3000 이 개발 PC의 서버로 향한다.
-  // (에뮬레이터/실기기 모두 adb reverse 지원. 에뮬레이터 전용 10.0.2.2 보다 이식성 높음.)
-  private val defaultBaseUrl = "http://127.0.0.1:3000/"
+  // 플레이버별 기본 서버 URL(BuildConfig). dev=adb reverse 127.0.0.1:3000, knox=프로덕션.
+  // 런타임 변경은 DeviceStore(BASE)로 오버라이드 가능.
+  private val defaultBaseUrl = BuildConfig.DEFAULT_BASE_URL
   val store: DeviceStore = DataStoreDeviceStore(context, defaultBaseUrl)
   private val db = Room.databaseBuilder(context, QueueDb::class.java, "pad-queue.db").build()
   private val queue: ReportQueue = RoomReportQueue(db.dao())
