@@ -11,6 +11,7 @@
 | `Dockerfile` · `docker-entrypoint.sh` | API 서버 컨테이너 이미지 (구성 A·B 공통) |
 | `compose/` | **구성 A**(단일 EC2): `docker-compose.prod.yml` + `Caddyfile` + `.env.prod.example` |
 | `terraform/` | **구성 B**(권장 매니지드): AWS IaC 스캐폴드 |
+| `ncp/` | **구성 C**(NCP CDN + 로컬 DB): 대시보드=NCP Object Storage/CDN+, API+DB=로컬 공인 원본. `docker-compose.yml` + `Caddyfile` + `.env.example` + 셋업 가이드 |
 
 ## 빠른 시작
 

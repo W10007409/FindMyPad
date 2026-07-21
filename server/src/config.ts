@@ -8,6 +8,8 @@ const EnvSchema = z.object({
   CORP_SSIDS: z.string().default(''),
   CORP_PUBLIC_IPS: z.string().default(''),
   MAXMIND_MMDB_PATH: z.string().optional(),
+  // 대시보드가 다른 오리진(NCP CDN)일 때 허용할 오리진 콤마목록. 비면 CORS 비활성(동일 오리진).
+  CORS_ORIGINS: z.string().default(''),
   TRUST_PROXY: z.enum(['true', 'false']).default('false').transform((v) => v === 'true'),
   FIREBASE_SERVICE_ACCOUNT: z.string().optional(),
 });

@@ -1,0 +1,11 @@
+# 이 도메인은 API 전용 원본(origin). 대시보드는 NCP CDN(app.<도메인>)에 별도.
+# Caddy가 Let's Encrypt로 TLS 자동 발급 (80/443 공개 + api.<도메인> A레코드 → 이 박스 공인 IP).
+# 앱/대시보드는 이 API를 호출:
+#   - Android defaultBaseUrl = https://{$API_DOMAIN}/
+#   - 대시보드 VITE_API_BASE_URL = https://{$API_DOMAIN}/api
+
+{$API_DOMAIN} {
+	encode gzip
+	# 모든 요청을 API로 (이 도메인은 API만 서빙). Caddy가 X-Forwarded-For를 채워 사내/외부망 판정 지원.
+	reverse_proxy api:3000
+}

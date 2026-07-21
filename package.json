@@ -17,6 +17,7 @@
     "import:assets": "tsx server/src/scripts/import-assets.ts"
   },
   "dependencies": {
+    "@fastify/cors": "^9.0.1",
     "drizzle-orm": "^0.36.4",
     "exceljs": "^4.4.0",
     "fastify": "^4.28.1",

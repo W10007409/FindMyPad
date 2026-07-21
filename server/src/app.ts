@@ -1,4 +1,5 @@
 import Fastify, { FastifyInstance } from 'fastify';
+import cors from '@fastify/cors';
 import type { Config } from './config.js';
 import type { DbClient } from './db/client.js';
 import type { FcmSender } from './services/fcm.js';
@@ -29,6 +30,16 @@ export function buildApp(deps: AppDeps, opts: { logger?: boolean } = {}): Fastif
     }
   });
   app.decorate('deps', deps);
+  // 대시보드가 다른 오리진(NCP CDN 등)일 때만 CORS 활성. CORS_ORIGINS 비면 동일 오리진으로 간주.
+  const corsOrigins = deps.config.CORS_ORIGINS.split(',').map((s) => s.trim()).filter(Boolean);
+  if (corsOrigins.length > 0) {
+    app.register(cors, {
+      origin: corsOrigins,
+      methods: ['GET', 'POST', 'PUT', 'OPTIONS'],
+      allowedHeaders: ['Content-Type', 'Authorization'],
+      maxAge: 86400,
+    });
+  }
   registerErrorHandler(app);
   registerAdminAuthRoutes(app);
   registerDeviceRoutes(app);
