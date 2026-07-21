@@ -1,4 +1,6 @@
-const BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? '/api';
+// 기본 API base는 배포 base 경로에서 파생: 루트('/')→'/api', '/FindMyPad/'→'/FindMyPad/api'.
+// VITE_API_BASE_URL로 명시 오버라이드 가능(다른 오리진 절대 URL 등).
+const BASE = (import.meta.env.VITE_API_BASE_URL as string | undefined) ?? `${import.meta.env.BASE_URL}api`;
 const TOKEN_KEY = 'pad_token';
 let onUnauthorized: (() => void) | null = null;
 

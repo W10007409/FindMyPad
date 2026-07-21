@@ -41,14 +41,24 @@ export function buildApp(deps: AppDeps, opts: { logger?: boolean } = {}): Fastif
     });
   }
   registerErrorHandler(app);
-  registerAdminAuthRoutes(app);
-  registerDeviceRoutes(app);
-  registerReportRoutes(app);
-  registerCheckoutRoutes(app);
-  registerAdminDeviceRoutes(app);
-  registerApMapRoutes(app);
-  registerAlertRoutes(app);
-  registerAssetRoutes(app);
-  app.get('/health', async () => ({ status: 'ok' }));
+  const registerRoutes = (instance: FastifyInstance) => {
+    registerAdminAuthRoutes(instance);
+    registerDeviceRoutes(instance);
+    registerReportRoutes(instance);
+    registerCheckoutRoutes(instance);
+    registerAdminDeviceRoutes(instance);
+    registerApMapRoutes(instance);
+    registerAlertRoutes(instance);
+    registerAssetRoutes(instance);
+    instance.get('/health', async () => ({ status: 'ok' }));
+  };
+  const base = deps.config.BASE_PATH;
+  if (base) {
+    // 모든 라우트를 접두사(/FindMyPad) 하위로. 컨테이너/인프라 헬스체크용 루트 /health도 유지.
+    app.register(async (instance) => registerRoutes(instance), { prefix: base });
+    app.get('/health', async () => ({ status: 'ok' }));
+  } else {
+    registerRoutes(app);
+  }
   return app;
 }

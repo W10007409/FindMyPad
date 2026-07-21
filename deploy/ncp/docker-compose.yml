@@ -35,8 +35,9 @@ services:
     environment:
       DATABASE_URL: ${DATABASE_URL}
       JWT_SECRET: ${JWT_SECRET}
-      TRUST_PROXY: "true"                    # Caddy 뒤 → X-Forwarded-For로 실 IP(사내/외부망 판정)
-      CORS_ORIGINS: ${CORS_ORIGINS}          # 대시보드 CDN 오리진 (예: https://app.example.com)
+      TRUST_PROXY: "true"                    # Caddy/프록시 뒤 → X-Forwarded-For로 실 IP(사내/외부망 판정)
+      BASE_PATH: ${BASE_PATH:-}              # 하위경로 배포 시 예: /FindMyPad (API가 /FindMyPad/api 로 서빙)
+      CORS_ORIGINS: ${CORS_ORIGINS:-}        # 대시보드가 '다른 오리진'일 때만. 같은 호스트(/FindMyPad)면 비움
       CORP_PUBLIC_IPS: ${CORP_PUBLIC_IPS:-}
       CORP_SSIDS: ${CORP_SSIDS:-}
       RETENTION_DAYS: ${RETENTION_DAYS:-90}

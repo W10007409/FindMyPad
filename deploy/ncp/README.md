@@ -1,69 +1,83 @@
-# NCP CDN + 로컬 DB 배포 가이드
+# NCP 배포 가이드 — https://wjtools.wjthinkbig.com/FindMyPad
 
-**구성**: 대시보드(정적)는 **NCP Object Storage + CDN+**, API+DB는 **로컬 박스(공인 IP)**.
-패드(외부)는 `https://api.<도메인>`(로컬)을 직접 호출, 관리자/직원은 `https://app.<도메인>`(NCP CDN) 접속.
+**목표**: 단일 호스트 하위경로 `…/FindMyPad` 에서 **프론트엔드 + API** 모두 서비스.
+- 프론트(정적) → NCP **Object Storage 버킷 `ai-srt-corrector`** 의 `FindMyPad/` 프리픽스 → NCP CDN/프록시가 서빙.
+- API(동적) + DB → **로컬 박스**(공인 IP). `/FindMyPad/api/*` 는 로컬 API로 라우팅.
+- 같은 호스트라 **CORS 불필요**(비활성). 서버는 **`BASE_PATH=/FindMyPad`** 로 `/FindMyPad/api` 를 서빙.
 
 ```mermaid
 flowchart LR
-  pad[외부 패드] -- HTTPS /api --> api
-  browser[브라우저] -- HTTPS --> cdn[NCP CDN+]
-  cdn -- 원본 pull --> obj[NCP Object Storage<br/>대시보드 dist]
-  browser -. XHR /api (CORS) .-> api
+  user[패드/브라우저] -- https://wjtools.wjthinkbig.com/FindMyPad --> edge[wjtools 프론트 계층<br/>CDN 또는 리버스프록시]
+  edge -- "/FindMyPad/* (정적)" --> obj[Object Storage<br/>ai-srt-corrector/FindMyPad/]
+  edge -- "/FindMyPad/api/* (동적)" --> api
   subgraph 로컬 박스 (공인 IP, 상시 ON)
-    caddy[Caddy TLS :443] --> api[API :3000]
-    api --> pg[(PostgreSQL 로컬)]
+    api[API BASE_PATH=/FindMyPad :3000] --> pg[(PostgreSQL 로컬)]
   end
   api -- FCM --> fcm[(Firebase)]
 ```
 
-- 대시보드(`app.<도메인>`)와 API(`api.<도메인>`)가 **다른 오리진** → API가 **CORS**로 대시보드 오리진 허용(`CORS_ORIGINS`). (서버에 반영됨)
+## 반영된 코드 변경 (이미 적용됨)
+- **서버**: `BASE_PATH` env → 모든 라우트를 `/FindMyPad` 하위에 등록(`/FindMyPad/api/...`, `/FindMyPad/health`). 루트 `/health`도 유지(컨테이너 체크).
+- **프론트**: `VITE_BASE_PATH`로 vite `base` 지정, 라우터 `basename`·API base가 `import.meta.env.BASE_URL`에서 파생.
 
-## 사전 준비
-- 로컬 박스: **공인 IP** + 방화벽 **80/443 인바운드 개방** + Docker.
-- 도메인 1개(예: `example.com`) + NCP 계정.
-- Firebase 프로젝트 + 서비스계정 JSON(서버용), `google-services.json`(앱용).
+## 1) 프론트엔드 빌드 → 버킷 업로드
+```bash
+cd dashboard
+# ⚠️ Git Bash면 MSYS_NO_PATHCONV=1 필수(슬래시 경로변환 방지). 리눅스/CI는 불필요.
+MSYS_NO_PATHCONV=1 VITE_BASE_PATH=/FindMyPad/ npm ci
+MSYS_NO_PATHCONV=1 VITE_BASE_PATH=/FindMyPad/ npm run build
+# dist/* 를 버킷 ai-srt-corrector 의 FindMyPad/ 아래로 업로드 (콘솔 또는 S3 호환 CLI)
+#   dist/index.html            -> ai-srt-corrector/FindMyPad/index.html
+#   dist/assets/*              -> ai-srt-corrector/FindMyPad/assets/*
+```
+빌드 결과 asset 경로가 `/FindMyPad/assets/...` 인지 확인. **SPA 폴백**: 버킷 정적 웹사이트 에러문서=`index.html`(또는 프론트 계층에서 404→/FindMyPad/index.html).
 
-## 1) DNS
-- `api.<도메인>` → **A레코드 = 로컬 박스 공인 IP**.
-- `app.<도메인>` → NCP CDN+ 도메인으로 **CNAME**(아래 3단계에서 발급).
-
-## 2) 로컬 API 원본 기동
+## 2) 로컬 API + DB 기동
 ```bash
 cd deploy/ncp
-cp .env.example .env          # API_DOMAIN, CORS_ORIGINS=https://app.<도메인>, DB비번, JWT 채우기
+cp .env.example .env      # BASE_PATH=/FindMyPad, API_DOMAIN(로컬 박스 도메인), DB비번, JWT 채우기
 mkdir -p ../secrets && cp <firebase 서비스계정>.json ../secrets/firebase-service-account.json
 docker compose up -d --build
-# Caddy가 api.<도메인> 인증서를 Let's Encrypt로 발급 (DNS+포트 선행 필요)
-curl https://api.<도메인>/health   # {"status":"ok"}
+curl https://<API_DOMAIN>/FindMyPad/health   # {"status":"ok"}
 ```
 
-## 3) 대시보드 → NCP Object Storage + CDN+
-```bash
-# API 도메인을 향하도록 빌드 (절대 URL)
-cd dashboard
-VITE_API_BASE_URL=https://api.<도메인>/api npm ci && VITE_API_BASE_URL=https://api.<도메인>/api npm run build
-# dist/ 를 NCP Object Storage 버킷에 업로드 (콘솔 또는 s3 호환 CLI)
+## 3) wjtools 프론트 계층 라우팅 (핵심)
+`wjtools.wjthinkbig.com` 을 서빙하는 계층에서 아래처럼 경로 분기해야 한다.
+
+**A. nginx 리버스프록시인 경우** (권장, 유연):
+```nginx
+# 동적 API → 로컬 원본 (경로 그대로 전달; 서버가 BASE_PATH=/FindMyPad 로 받음)
+location /FindMyPad/api/ {
+    proxy_pass https://findmypad-origin.example.com;   # 로컬 박스(API_DOMAIN)
+    proxy_set_header Host              $host;
+    proxy_set_header X-Forwarded-For   $proxy_add_x_forwarded_for;   # 사내/외부망 판정
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_http_version 1.1;
+}
+# 정적 → 버킷 (SPA 폴백)
+location /FindMyPad/ {
+    proxy_pass https://<ai-srt-corrector 버킷/CDN 엔드포인트>/FindMyPad/;
+    proxy_intercept_errors on;
+    error_page 404 = /FindMyPad/index.html;
+}
 ```
-NCP 콘솔 절차:
-1. **Object Storage** 버킷 생성 → `dashboard/dist` 업로드. **정적 웹사이트 호스팅** 활성화, **인덱스=index.html, 에러문서=index.html**(SPA 라우팅 폴백).
-2. **CDN+** 서비스 생성 → 원본(origin)=그 Object Storage 버킷/웹사이트 엔드포인트.
-3. CDN+에 **커스텀 도메인 `app.<도메인>`** 연결 + 인증서(Certificate Manager). 발급된 CDN 도메인을 1단계 CNAME에 지정.
-4. 캐시 정책: 정적 자원 캐시. (API는 CDN을 거치지 않으므로 무관)
+
+**B. NCP CDN+(원본=버킷)만 있는 경우**:
+- CDN+ 에 **경로별 원본 규칙**으로 `/FindMyPad/api/*` → 두 번째 원본(로컬 API `API_DOMAIN`), 그 외 `/FindMyPad/*` → 버킷. (NCP CDN+가 경로별 원본을 지원할 때)
+- 지원하지 않으면 위 **A(nginx)** 를 프론트 계층으로 두거나, API만 별도 호스트로 노출(그 경우 `CORS_ORIGINS` 설정 필요).
 
 ## 4) 앱 baseUrl (배포 전 필수)
 `android-agent/app/src/main/java/com/wjtb/padtracker/AppContainer.kt`
 ```kotlin
-private val defaultBaseUrl = "https://api.<도메인>/"
+private val defaultBaseUrl = "https://wjtools.wjthinkbig.com/FindMyPad/"
 ```
-로 변경 후 **재서명 릴리스 빌드**(`deploy/README` 서명 방식). knox flavor는 cleartext 불가 → HTTPS 필수.
+(PadApi가 `api/reports` 등 상대경로 → `…/FindMyPad/api/reports`.) 변경 후 재서명 릴리스 빌드. knox flavor는 HTTPS 필수.
 
 ## 5) 검증
-- 브라우저에서 `https://app.<도메인>` → 로그인 → 네트워크 탭에서 `https://api.<도메인>/api/...` 호출이 **CORS 통과**(200)하는지.
-- 패드(앱)에서 보고가 `api.<도메인>`으로 도달하는지(관리자 상세에 최근 보고 갱신).
+- 브라우저 `https://wjtools.wjthinkbig.com/FindMyPad` → 로그인 → `/FindMyPad/api/...` 200.
+- 앱 보고가 `…/FindMyPad/api/reports` 로 도달 → 관리자 상세에 최근 보고 갱신.
 
-## 주의사항
-- **상시 전원/네트워크**: 로컬 박스가 꺼지면 패드 보고 중단. 관리형 HA 없음.
-- **DB 백업 직접**: 예) 야간 `pg_dump` 크론 + 외부 저장. RDS 자동백업 없음.
-- **client IP**: 사내/외부망 판정은 Caddy의 `X-Forwarded-For`(→`TRUST_PROXY=true`)로 동작. NCP CDN은 대시보드 정적에만 관여하므로 API의 client IP에 영향 없음.
-- **보안**: API가 인터넷 직노출 → JWT 인증 유지(있음). 필요시 방화벽 소스 제한/WAF 고려.
-- `.env`·`../secrets/`는 커밋 금지(.gitignore 처리).
+## 주의
+- 로컬 박스 상시 ON, **DB 백업 직접**(pg_dump 크론).
+- API가 인터넷 경유 노출 → JWT 유지. 프론트 계층에서 소스 IP 제한/WAF 고려.
+- `.env`·`../secrets/` 커밋 금지.
