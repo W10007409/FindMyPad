@@ -36,16 +36,12 @@ android {
   }
   flavorDimensions += "target"
   productFlavors {
-    create("dev") {
-      dimension = "target"
-      // 로컬 개발: adb reverse 127.0.0.1:3000
-      buildConfigField("String", "DEFAULT_BASE_URL", "\"http://127.0.0.1:3000/\"")
-    }
+    // dev = Knox 없는 앱(Mock 기기제어 + 실 FCM). debug=로컬, release=프로덕션(출시 빌드).
+    create("dev") { dimension = "target" }
+    // knox = (보류) Knox 강제기능. KPE 라이선스+삼성 서버 접근 필요. 출시엔 미사용.
     create("knox") {
       dimension = "target"
       buildConfigField("String", "KPE_LICENSE_KEY", "\"$kpeLicenseKey\"")
-      // 프로덕션 서버 URL (구성 B: 단일 호스트 하위경로)
-      buildConfigField("String", "DEFAULT_BASE_URL", "\"$prodBaseUrl\"")
     }
   }
   signingConfigs {
@@ -59,10 +55,16 @@ android {
     }
   }
   buildTypes {
+    getByName("debug") {
+      // 로컬 개발: adb reverse 127.0.0.1:3000 (cleartext는 src/debug 매니페스트에서 허용)
+      buildConfigField("String", "DEFAULT_BASE_URL", "\"http://127.0.0.1:3000/\"")
+    }
     getByName("release") {
       isMinifyEnabled = false
       // keystore 정보가 있을 때만 서명(없으면 unsigned release).
       if (releaseKeystoreFile != null) signingConfig = signingConfigs.getByName("release")
+      // 프로덕션 서버 URL(HTTPS). local.properties PROD_BASE_URL 로 오버라이드.
+      buildConfigField("String", "DEFAULT_BASE_URL", "\"$prodBaseUrl\"")
     }
   }
   buildFeatures { compose = true; buildConfig = true }

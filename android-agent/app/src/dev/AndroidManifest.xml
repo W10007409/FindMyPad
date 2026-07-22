@@ -1,6 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <!-- dev 플레이버: 로컬 HTTP 서버(adb reverse 127.0.0.1:3000)와 통신하므로 평문 허용.
-         release/knox 는 이 선언이 없어 평문 차단(사내 리버스 프록시 뒤 HTTPS). -->
-    <application android:usesCleartextTraffic="true" />
-</manifest>
