@@ -1,0 +1,16 @@
+# frpc — 내부 서버에서 실행. 릴레이로 아웃바운드 연결 후 내부 API를 노출.
+serverAddr = "RELAY_PUBLIC_IP"        # NCP 릴레이 서버 공인 IP
+serverPort = 7000
+auth.method = "token"
+auth.token = "CHANGE_ME_strong_shared_tunnel_token"   # frps와 동일
+
+# (선택) 터널 구간 암호화/압축
+transport.useEncryption = true
+transport.useCompression = true
+
+[[proxies]]
+name = "findmypad-api"
+type = "tcp"
+localIP = "api"       # 같은 compose 네트워크의 api 서비스 (아래 docker-compose.internal.yml)
+localPort = 3000      # 내부 API 컨테이너 포트
+remotePort = 8080     # 릴레이에서 열릴 포트 (CDN이 이 포트로 당김)

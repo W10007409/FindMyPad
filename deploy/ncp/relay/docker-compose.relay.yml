@@ -1,0 +1,14 @@
+# NCP 릴레이 서버(공인 IP)에서 실행. frps 만 돈다(데이터 없음).
+#   cp frps.toml 편집(token/비번) → docker compose -f docker-compose.relay.yml up -d
+# 방화벽(ACG): 7000/tcp = 내부서버 egress IP 만, 8080/tcp = NCP CDN egress IP 만.
+name: findmypad-relay
+
+services:
+  frps:
+    image: snowdreamtech/frps:0.61.0
+    restart: unless-stopped
+    volumes:
+      - ./frps.toml:/etc/frp/frps.toml:ro
+    ports:
+      - "7000:7000"     # frpc 연결 수신
+      - "8080:8080"     # CDN이 당길 forward 포트 (frpc의 remotePort)
